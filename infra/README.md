@@ -155,6 +155,46 @@ Cada entrega é **pequena**, **testável** e prepara a próxima. Você pode vali
 
 **Critério de sucesso:** `docker compose up` sobe tudo; um script ou curl consegue registrar usuário, fazer login e chamar um endpoint de ms-video.
 
+#### Como rodar a Entrega 1
+
+Os três microsserviços usam a imagem **ms-stub** (placeholder em Go) até que os serviços reais existam. RabbitMQ e Postgres sobem como dependências.
+
+1. **Variáveis de ambiente (opcional)**  
+   Copie o exemplo e ajuste se quiser:  
+   `cp infra/.env.example infra/.env`  
+   Os valores padrão (dev/dev/video_system) funcionam para desenvolvimento local. Se usar `infra/.env`, rode a partir de `infra/` com `docker compose up -d --build` para que o arquivo seja carregado, ou use `--env-file infra/.env` ao rodar da raiz.
+
+2. **Subir todos os serviços** (a partir da raiz do repositório):
+   ```bash
+   docker compose -f infra/docker-compose.yml up -d --build
+   ```
+   (Ou, a partir de `infra/`: `cd infra && docker compose up -d --build`.)
+
+3. **Verificar** que todos estão em execução e saudáveis:
+   ```bash
+   docker compose -f infra/docker-compose.yml ps
+   ```
+
+4. **Teste do fluxo mínimo (com stubs)**  
+   Com os stubs, "registrar usuário / login" é simulado pela resposta do ms-auth em `GET /`; "chamar endpoint de ms-video" é simulado por `GET /` no ms-video. Quando os microsserviços reais existirem, basta trocar a imagem no Compose.
+
+   - ms-auth:   `curl -s http://localhost:8081/`  → esperado: `{"service":"ms-auth"}`
+   - ms-video:  `curl -s http://localhost:8082/`  → esperado: `{"service":"ms-video"}`
+   - ms-notify: `curl -s http://localhost:8083/`  → esperado: `{"service":"ms-notify"}`
+
+   RabbitMQ Management UI: http://localhost:15672 (usuário/senha padrão: guest/guest).
+
+5. **Smoke test**  
+   Para validar o critério de sucesso de forma automatizada:
+   ```bash
+   ./infra/scripts/smoke-test.sh
+   ```
+
+6. **Parar os serviços**:
+   ```bash
+   docker compose -f infra/docker-compose.yml down
+   ```
+
 ---
 
 ### Entrega 2 — Manifests Kubernetes (Kustomize) local
