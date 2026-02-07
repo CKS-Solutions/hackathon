@@ -208,6 +208,34 @@ Os três microsserviços usam a imagem **ms-stub** (placeholder em Go) até que 
 
 **Critério de sucesso:** `kubectl get pods` mostra os 3 microsserviços + RabbitMQ (e opcionalmente Postgres) rodando; consegue chamar um endpoint via port-forward.
 
+#### Como rodar a Entrega 2
+
+Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local **kind** ou **minikube** e carregue a imagem **ms-stub:local** no cluster antes de aplicar.
+
+**Opção A — kind**
+
+1. Criar o cluster: `kind create cluster`
+2. Build da imagem (na raiz do repo): `docker build -t ms-stub:local packages/ms-stub`
+3. Carregar a imagem no cluster: `kind load docker-image ms-stub:local`
+4. Aplicar os manifests: `kubectl apply -k infra/k8s/overlays/dev`
+5. Aguardar os pods ficarem Ready: `kubectl get pods -w` (Ctrl+C quando todos estiverem Running/Ready)
+6. Testar um endpoint (port-forward): `kubectl port-forward svc/ms-auth 8081:8080` e em outro terminal: `curl -s http://localhost:8081/` (esperado: `{"service":"ms-auth"}`)
+
+**Opção B — minikube**
+
+1. Iniciar o cluster: `minikube start`
+2. Usar o daemon Docker do minikube e fazer o build: `eval $(minikube docker-env)` e `docker build -t ms-stub:local packages/ms-stub` (ou: `minikube image build -t ms-stub:local packages/ms-stub`)
+3. Aplicar os manifests: `kubectl apply -k infra/k8s/overlays/dev`
+4. Aguardar os pods: `kubectl get pods -w`
+5. Port-forward e teste: `kubectl port-forward svc/ms-auth 8081:8080` e `curl -s http://localhost:8081/`
+
+**Comandos úteis**
+
+- Listar pods: `kubectl get pods`
+- Logs de um pod: `kubectl logs -l app=ms-auth -f`
+- Remover os recursos: `kubectl delete -k infra/k8s/overlays/dev`
+- (kind) Deletar o cluster: `kind delete cluster`
+
 ---
 
 ### Entrega 3 — Terraform: VPC e EKS (dev)
