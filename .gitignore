@@ -3,6 +3,7 @@
 #
 # Binaries for programs and plugins
 *.exe
+/packages/ms-stub/ms-stub
 *.exe~
 *.dll
 *.so
