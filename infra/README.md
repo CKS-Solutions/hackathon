@@ -312,6 +312,34 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
 
 **Critério de sucesso:** Push no repo dispara o workflow; imagens aparecem no ECR.
 
+#### Como rodar a Entrega 4
+
+**Pré-requisitos:** Conta AWS configurada, Terraform instalado, repositório no GitHub com o código, permissão para criar Secrets e Variables no repo.
+
+1. **Terraform (apply rápido)**  
+   Para criar só ECR e OIDC (sem esperar EKS), comente em [infra/terraform/environments/prod/main.tf](infra/terraform/environments/prod/main.tf) os blocos dos módulos **vpc** e **eks**, e em [outputs.tf](infra/terraform/environments/prod/outputs.tf) comente os outputs **vpc_id**, **cluster_id**, **cluster_endpoint** e **kubeconfig_command**. Depois:
+   ```bash
+   cd infra/terraform/environments/prod
+   cp terraform.tfvars.example terraform.tfvars   # se ainda não tiver
+   # Edite terraform.tfvars e defina github_repo (ex.: "sua-org/hackathon")
+   terraform init -backend-config=backend.hcl
+   terraform plan && terraform apply
+   ```
+   Anote os outputs **ecr_repository_urls** e **github_actions_role_arn**. Para a Entrega 5, descomente vpc, eks e os outputs e rode `terraform apply` de novo.
+
+2. **GitHub — Secrets e Variables**  
+   No repositório (Settings → Secrets and variables → Actions):
+   - **Secret:** `AWS_ROLE_ARN` = valor do output `github_actions_role_arn`.
+   - **Variables:** `AWS_REGION` (ex.: `us-east-1`), `ECR_MS_AUTH_URL`, `ECR_MS_VIDEO_URL`, `ECR_MS_NOTIFY_URL` = URLs do output `ecr_repository_urls` (uma por serviço). Não commitar secrets; OIDC evita chaves de longa duração.
+
+3. **Disparar o workflow**  
+   Dê push na branch principal (ex.: `main`). O workflow faz build, scan (Trivy) e push para o ECR. Em **pull_request** só rodam build e scan (push não é feito).
+
+4. **Validar**  
+   No console AWS (ECR), confira os repositórios ms-auth, ms-video e ms-notify com imagens tagadas pelo **SHA** do commit e por **latest**.
+
+**Rollback:** Em caso de imagem quebrada, use no Kustomize (Entrega 5) a tag do commit anterior (SHA) que já está no ECR.
+
 ---
 
 ### Entrega 5 — Deploy no EKS (kubectl / Kustomize)

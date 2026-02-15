@@ -31,3 +31,19 @@ variable "vpc_cidr" {
   type        = string
   default     = "10.0.0.0/16"
 }
+
+variable "github_repo" {
+  description = "GitHub repository in owner/repo format (for OIDC trust policy)."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$", var.github_repo))
+    error_message = "github_repo must be in owner/repo format (e.g. myorg/my-repo)."
+  }
+}
+
+variable "github_branch" {
+  description = "Branch allowed to assume the GitHub Actions IAM role (e.g. main)."
+  type        = string
+  default     = "main"
+}

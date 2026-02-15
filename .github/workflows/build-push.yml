@@ -1,0 +1,71 @@
+# Build ms-stub and push to ECR (tags: github.sha + latest).
+# Push to ECR only on push to main; on PR we only build and scan.
+
+name: Build and Push to ECR
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  IMAGE_NAME: ms-stub
+
+jobs:
+  build-and-push:
+    name: Build, scan, and push
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./packages/ms-stub
+          file: ./packages/ms-stub/Dockerfile
+          load: true
+          tags: stub:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: stub:${{ github.sha }}
+          format: table
+          exit-code: 1
+          severity: CRITICAL,HIGH
+
+      - name: Tag and push to ECR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          ECR_MS_AUTH_URL: ${{ vars.ECR_MS_AUTH_URL }}
+          ECR_MS_VIDEO_URL: ${{ vars.ECR_MS_VIDEO_URL }}
+          ECR_MS_NOTIFY_URL: ${{ vars.ECR_MS_NOTIFY_URL }}
+        run: |
+          for repo in "$ECR_MS_AUTH_URL" "$ECR_MS_VIDEO_URL" "$ECR_MS_NOTIFY_URL"; do
+            docker tag stub:${{ github.sha }} "${repo}:${{ github.sha }}"
+            docker tag stub:${{ github.sha }} "${repo}:latest"
+            docker push "${repo}:${{ github.sha }}"
+            docker push "${repo}:latest"
+          done
