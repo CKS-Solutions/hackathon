@@ -129,7 +129,8 @@ data "aws_iam_policy_document" "github_actions_terraform_manage" {
       "iam:PutRolePolicy",
       "iam:DeleteRolePolicy",
       "iam:GetRolePolicy",
-      "iam:ListRolePolicies"
+      "iam:ListRolePolicies",
+      "iam:ListAttachedRolePolicies"
     ]
     resources = [aws_iam_role.github_actions_ecr.arn]
   }
@@ -143,7 +144,8 @@ data "aws_iam_policy_document" "github_actions_terraform_manage" {
       "ecr:DeleteRepository",
       "ecr:PutLifecyclePolicy",
       "ecr:GetLifecyclePolicy",
-      "ecr:DeleteLifecyclePolicy"
+      "ecr:DeleteLifecyclePolicy",
+      "ecr:ListTagsForResource"
     ]
     resources = ["*"]
   }
