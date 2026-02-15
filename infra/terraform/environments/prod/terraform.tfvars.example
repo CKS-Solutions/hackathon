@@ -11,8 +11,8 @@ cluster_version = "1.31"
 vpc_cidr      = "10.0.0.0/16"
 
 # GitHub OIDC (Entrega 4) — replace with your repo
-github_repo  = "CKS-Solutions/hackathon"
+github_repo   = "CKS-Solutions/hackathon"
 github_branch = "master"
 
-# Optional: backend S3 bucket (create manually before init)
-# See README "Como rodar a Entrega 3" for bucket creation.
+# Terraform state bucket — same name as in GitHub secret TF_STATE_BUCKET (for CI S3 permissions)
+terraform_state_bucket = "terraform-hackathon"

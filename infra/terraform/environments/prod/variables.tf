@@ -47,3 +47,8 @@ variable "github_branch" {
   type        = string
   default     = "master"
 }
+
+variable "terraform_state_bucket" {
+  description = "S3 bucket name for Terraform state (used by GitHub Actions to read/write state)."
+  type        = string
+}

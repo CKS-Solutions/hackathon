@@ -67,8 +67,38 @@ data "aws_iam_policy_document" "github_actions_ecr" {
   }
 }
 
+# S3 permissions for Terraform state (backend) — same role used by terraform-apply/destroy workflows
+data "aws_iam_policy_document" "github_actions_tf_state" {
+  statement {
+    sid    = "TerraformStateBucketList"
+    effect = "Allow"
+    actions = [
+      "s3:ListBucket"
+    ]
+    resources = ["arn:aws:s3:::${var.terraform_state_bucket}"]
+  }
+
+  statement {
+    sid    = "TerraformStateObject"
+    effect = "Allow"
+    actions = [
+      "s3:GetObject",
+      "s3:HeadObject",
+      "s3:PutObject",
+      "s3:DeleteObject"
+    ]
+    resources = ["arn:aws:s3:::${var.terraform_state_bucket}/prod/*"]
+  }
+}
+
 resource "aws_iam_role_policy" "github_actions_ecr" {
   name   = "ecr-push"
   role   = aws_iam_role.github_actions_ecr.id
   policy = data.aws_iam_policy_document.github_actions_ecr.json
+}
+
+resource "aws_iam_role_policy" "github_actions_tf_state" {
+  name   = "tf-state-s3"
+  role   = aws_iam_role.github_actions_ecr.id
+  policy = data.aws_iam_policy_document.github_actions_tf_state.json
 }
