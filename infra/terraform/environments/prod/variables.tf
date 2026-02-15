@@ -13,11 +13,13 @@ variable "environment" {
 variable "availability_zones" {
   description = "List of availability zone names for VPC subnets."
   type        = list(string)
+  default     = ["us-east-1a", "us-east-1b"]
 }
 
 variable "cluster_name" {
   description = "Name of the EKS cluster."
   type        = string
+  default     = "hackathon-prod"
 }
 
 variable "cluster_version" {
@@ -33,7 +35,7 @@ variable "vpc_cidr" {
 }
 
 variable "github_repo" {
-  description = "GitHub repository in owner/repo format (for OIDC trust policy)."
+  description = "GitHub repository in owner/repo format (for OIDC trust policy). In CI, set via TF_VAR_github_repo from github.repository."
   type        = string
 
   validation {

@@ -27,6 +27,10 @@ jobs:
       id-token: write
       contents: read
       pull-requests: write
+    env:
+      # Only what CI must provide: repo (for OIDC) and state bucket. Rest from variables.tf defaults.
+      TF_VAR_github_repo: ${{ github.repository }}
+      TF_VAR_terraform_state_bucket: ${{ secrets.TF_STATE_BUCKET }}
     defaults:
       run:
         working-directory: infra/terraform/environments/prod
