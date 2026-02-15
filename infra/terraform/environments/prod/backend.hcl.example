@@ -1,0 +1,6 @@
+# Backend S3 — copie para backend.hcl e preencha o bucket.
+# Uso: terraform init -backend-config=backend.hcl
+
+bucket  = "SEU_BUCKET_PROD"
+key     = "prod/terraform.tfstate"
+region  = "us-east-1"

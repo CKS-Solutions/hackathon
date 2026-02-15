@@ -245,10 +245,60 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
 - Criar **infra/terraform/modules/vpc** (subnets públicas/privadas, NAT, etc.).
 - Criar **infra/terraform/modules/eks** (cluster, node group, OIDC para IRSA se for usar depois).
 - Criar **infra/terraform/environments/dev** que usa esses módulos e chama o provider AWS.
-- Configurar **backend remoto** (S3 + DynamoDB para lock) para o state.
+- Configurar **backend remoto** S3 para o state (sem DynamoDB neste escopo).
 - Executar `terraform plan` / `terraform apply` e conectar `kubectl` ao EKS (update kubeconfig).
 
 **Critério de sucesso:** EKS criado; `kubectl get nodes` mostra os nodes do cluster em dev.
+
+#### Como rodar a Entrega 3
+
+**Pré-requisitos:** AWS CLI configurado (`aws configure` ou variáveis de ambiente), Terraform instalado, `kubectl` instalado.
+
+1. **Criar o bucket S3 para o state**  
+   O backend usa S3. Crie um bucket antes do primeiro `terraform init`. Neste escopo usamos um bucket **sem versionamento** para reduzir custo; em produção o recomendado é habilitar versionamento no bucket (histórico do state e recuperação).  
+   Exemplo (substitua `SEU_BUCKET` por um nome único):
+   ```bash
+   aws s3 mb s3://SEU_BUCKET --region us-east-1
+   ```
+
+2. **Configurar variáveis**  
+   Copie o exemplo e ajuste:
+   ```bash
+   cd infra/terraform/environments/dev
+   cp terraform.tfvars.example terraform.tfvars
+   # Edite terraform.tfvars com aws_region, availability_zones, cluster_name, etc.
+   ```
+
+3. **Inicializar Terraform com o backend**  
+   **Recomendado (boa prática):** use um arquivo de config do backend para deixar o comando curto e repetível.
+   ```bash
+   cp backend.hcl.example backend.hcl
+   # Edite backend.hcl e defina bucket (e region se precisar)
+   terraform init -backend-config=backend.hcl
+   ```
+   Alternativa (tudo na linha):  
+   `terraform init -backend-config=bucket=SEU_BUCKET -backend-config=key=dev/terraform.tfstate -backend-config=region=us-east-1`
+
+4. **Planejar e aplicar**
+   ```bash
+   terraform plan
+   terraform apply
+   ```
+
+5. **Atualizar o kubeconfig**  
+   Use o comando exibido no output `kubeconfig_command` ou:
+   ```bash
+   aws eks update-kubeconfig --region <sua-region> --name <cluster_name>
+   ```
+   Exemplo: `aws eks update-kubeconfig --region us-east-1 --name hackathon-dev`
+
+6. **Validar**  
+   Os nodes do node group devem aparecer como Ready:
+   ```bash
+   kubectl get nodes
+   ```
+
+**Opcional:** Para destruir os recursos e evitar custo quando não estiver usando: `terraform destroy`. O bucket S3 pode ser removido manualmente depois (`aws s3 rb s3://SEU_BUCKET --force`).
 
 ---
 
