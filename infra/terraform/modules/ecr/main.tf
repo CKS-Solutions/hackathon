@@ -6,7 +6,7 @@ resource "aws_ecr_repository" "this" {
 }
 
 resource "aws_ecr_lifecycle_policy" "this" {
-  for_each = var.lifecycle_policy_count != null && var.lifecycle_policy_count > 0 ? toset(var.repository_names) : toset([])
+  for_each = coalesce(var.lifecycle_policy_count, 0) > 0 ? toset(var.repository_names) : toset([])
 
   repository = aws_ecr_repository.this[each.key].name
 
