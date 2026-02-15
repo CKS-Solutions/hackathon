@@ -3,6 +3,7 @@
 #
 # Binaries for programs and plugins
 *.exe
+/packages/ms-stub/ms-stub
 *.exe~
 *.dll
 *.so
@@ -25,8 +26,17 @@ go.work
 go.work.sum
 
 # env file
-.env
+*/.env
 
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+!*.tfvars.example
+backend.hcl
+!backend.hcl.example

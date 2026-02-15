@@ -1,0 +1,18 @@
+# Copy to terraform.tfvars and set values. Do not commit terraform.tfvars.
+
+aws_region = "us-east-1"
+environment = "prod"
+
+# At least 2 AZs recommended for EKS. Replace with your desired AZs.
+availability_zones = ["us-east-1a", "us-east-1b"]
+
+cluster_name  = "hackathon-prod"
+cluster_version = "1.31"
+vpc_cidr      = "10.0.0.0/16"
+
+# GitHub OIDC (Entrega 4) — replace with your repo
+github_repo  = "CKS-Solutions/hackathon"
+github_branch = "master"
+
+# Optional: backend S3 bucket (create manually before init)
+# See README "Como rodar a Entrega 3" for bucket creation.
