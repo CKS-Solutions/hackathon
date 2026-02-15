@@ -102,3 +102,66 @@ resource "aws_iam_role_policy" "github_actions_tf_state" {
   role   = aws_iam_role.github_actions_ecr.id
   policy = data.aws_iam_policy_document.github_actions_tf_state.json
 }
+
+# Permissions for Terraform (plan/apply) to read and manage IAM OIDC, ECR, and S3 bucket policy
+data "aws_iam_policy_document" "github_actions_terraform_manage" {
+  statement {
+    sid    = "TerraformIAMOIDC"
+    effect = "Allow"
+    actions = [
+      "iam:GetOpenIDConnectProvider",
+      "iam:CreateOpenIDConnectProvider",
+      "iam:DeleteOpenIDConnectProvider",
+      "iam:UpdateOpenIDConnectProviderThumbprint",
+      "iam:ListOpenIDConnectProviderTags"
+    ]
+    resources = [aws_iam_openid_connect_provider.github.arn]
+  }
+
+  statement {
+    sid    = "TerraformIAMRole"
+    effect = "Allow"
+    actions = [
+      "iam:GetRole",
+      "iam:CreateRole",
+      "iam:DeleteRole",
+      "iam:PassRole",
+      "iam:PutRolePolicy",
+      "iam:DeleteRolePolicy",
+      "iam:GetRolePolicy",
+      "iam:ListRolePolicies"
+    ]
+    resources = [aws_iam_role.github_actions_ecr.arn]
+  }
+
+  statement {
+    sid    = "TerraformECR"
+    effect = "Allow"
+    actions = [
+      "ecr:DescribeRepositories",
+      "ecr:CreateRepository",
+      "ecr:DeleteRepository",
+      "ecr:PutLifecyclePolicy",
+      "ecr:GetLifecyclePolicy",
+      "ecr:DeleteLifecyclePolicy"
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "TerraformS3BucketPolicy"
+    effect = "Allow"
+    actions = [
+      "s3:GetBucketPolicy",
+      "s3:PutBucketPolicy",
+      "s3:DeleteBucketPolicy"
+    ]
+    resources = ["arn:aws:s3:::${var.terraform_state_bucket}"]
+  }
+}
+
+resource "aws_iam_role_policy" "github_actions_terraform_manage" {
+  name   = "terraform-manage"
+  role   = aws_iam_role.github_actions_ecr.id
+  policy = data.aws_iam_policy_document.github_actions_terraform_manage.json
+}
