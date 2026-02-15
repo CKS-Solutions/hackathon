@@ -43,7 +43,7 @@ variable "github_repo" {
 }
 
 variable "github_branch" {
-  description = "Branch allowed to assume the GitHub Actions IAM role (e.g. main)."
+  description = "Branch allowed to assume the GitHub Actions IAM role (e.g. master)."
   type        = string
-  default     = "main"
+  default     = "master"
 }
