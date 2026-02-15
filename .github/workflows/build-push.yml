@@ -7,6 +7,9 @@ on:
   workflow_dispatch:
   push:
     branches: [master]
+    paths:
+      - 'packages/**'
+      - '.github/workflows/build-push.yml'
   pull_request:
     branches: [master]
 

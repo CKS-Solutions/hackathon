@@ -1,0 +1,95 @@
+# Terraform plan and apply. Apply only on push to master or workflow_dispatch.
+# On PR: plan only (no apply). Backend via secrets TF_STATE_* and AWS OIDC.
+
+name: Terraform Apply
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'infra/terraform/**'
+      - '.github/workflows/terraform-apply.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'infra/terraform/**'
+      - '.github/workflows/terraform-apply.yml'
+  workflow_dispatch:
+
+env:
+  TF_VERSION: '1.9.0'
+
+jobs:
+  terraform:
+    name: Terraform Plan & Apply
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+    defaults:
+      run:
+        working-directory: infra/terraform/environments/prod
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=prod/terraform.tfstate" \
+            -backend-config="region=${{ vars.TF_STATE_REGION }}"
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan -no-color -out=tfplan 2>&1 | tee plan_output.txt
+
+      - name: Plan summary for PR
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "PLAN_SUMMARY<<EOF" >> "$GITHUB_ENV"
+          grep -E '(Plan:|No changes.|# |Error)' plan_output.txt >> "$GITHUB_ENV" || true
+          echo "EOF" >> "$GITHUB_ENV"
+
+      - name: Comment PR with plan
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const summary = process.env.PLAN_SUMMARY || 'Plan could not be captured.';
+            const body = `#### Terraform Plan \`prod\` 📖
+            \`\`\`
+            ${summary}
+            \`\`\`
+            *Triggered by @${{ github.actor }}, \`${{ github.event_name }}\`*`;
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
+
+      - name: Terraform Apply
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/master') || github.event_name == 'workflow_dispatch'
+        run: terraform apply -auto-approve tfplan
