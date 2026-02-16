@@ -67,103 +67,19 @@ data "aws_iam_policy_document" "github_actions_ecr" {
   }
 }
 
-# S3 permissions for Terraform state (backend) — same role used by terraform-apply/destroy workflows
-data "aws_iam_policy_document" "github_actions_tf_state" {
-  statement {
-    sid    = "TerraformStateBucketList"
-    effect = "Allow"
-    actions = [
-      "s3:ListBucket"
-    ]
-    resources = ["arn:aws:s3:::${var.terraform_state_bucket}"]
-  }
-
-  statement {
-    sid    = "TerraformStateObject"
-    effect = "Allow"
-    actions = [
-      "s3:GetObject",
-      "s3:HeadObject",
-      "s3:PutObject",
-      "s3:DeleteObject"
-    ]
-    resources = ["arn:aws:s3:::${var.terraform_state_bucket}/prod/*"]
-  }
-}
-
 resource "aws_iam_role_policy" "github_actions_ecr" {
   name   = "ecr-push"
   role   = aws_iam_role.github_actions_ecr.id
   policy = data.aws_iam_policy_document.github_actions_ecr.json
 }
 
-resource "aws_iam_role_policy" "github_actions_tf_state" {
-  name   = "tf-state-s3"
-  role   = aws_iam_role.github_actions_ecr.id
-  policy = data.aws_iam_policy_document.github_actions_tf_state.json
+# Role só para Terraform (plan/apply/destroy). Uma managed policy evita ficar listando permissão por permissão.
+resource "aws_iam_role" "github_actions_terraform" {
+  name               = "github-actions-terraform"
+  assume_role_policy = data.aws_iam_policy_document.github_oidc_assume.json
 }
 
-# Permissions for Terraform (plan/apply) to read and manage IAM OIDC, ECR, and S3 bucket policy
-data "aws_iam_policy_document" "github_actions_terraform_manage" {
-  statement {
-    sid    = "TerraformIAMOIDC"
-    effect = "Allow"
-    actions = [
-      "iam:GetOpenIDConnectProvider",
-      "iam:CreateOpenIDConnectProvider",
-      "iam:DeleteOpenIDConnectProvider",
-      "iam:UpdateOpenIDConnectProviderThumbprint",
-      "iam:ListOpenIDConnectProviderTags"
-    ]
-    resources = [aws_iam_openid_connect_provider.github.arn]
-  }
-
-  statement {
-    sid    = "TerraformIAMRole"
-    effect = "Allow"
-    actions = [
-      "iam:GetRole",
-      "iam:CreateRole",
-      "iam:DeleteRole",
-      "iam:PassRole",
-      "iam:PutRolePolicy",
-      "iam:DeleteRolePolicy",
-      "iam:GetRolePolicy",
-      "iam:ListRolePolicies",
-      "iam:ListAttachedRolePolicies"
-    ]
-    resources = [aws_iam_role.github_actions_ecr.arn]
-  }
-
-  statement {
-    sid    = "TerraformECR"
-    effect = "Allow"
-    actions = [
-      "ecr:DescribeRepositories",
-      "ecr:CreateRepository",
-      "ecr:DeleteRepository",
-      "ecr:PutLifecyclePolicy",
-      "ecr:GetLifecyclePolicy",
-      "ecr:DeleteLifecyclePolicy",
-      "ecr:ListTagsForResource"
-    ]
-    resources = ["*"]
-  }
-
-  statement {
-    sid    = "TerraformS3BucketPolicy"
-    effect = "Allow"
-    actions = [
-      "s3:GetBucketPolicy",
-      "s3:PutBucketPolicy",
-      "s3:DeleteBucketPolicy"
-    ]
-    resources = ["arn:aws:s3:::${var.terraform_state_bucket}"]
-  }
-}
-
-resource "aws_iam_role_policy" "github_actions_terraform_manage" {
-  name   = "terraform-manage"
-  role   = aws_iam_role.github_actions_ecr.id
-  policy = data.aws_iam_policy_document.github_actions_terraform_manage.json
+resource "aws_iam_role_policy_attachment" "terraform_power_user" {
+  role       = aws_iam_role.github_actions_terraform.name
+  policy_arn = "arn:aws:iam::aws:policy/PowerUserAccess"
 }

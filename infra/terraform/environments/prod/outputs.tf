@@ -4,8 +4,13 @@ output "ecr_repository_urls" {
 }
 
 output "github_actions_role_arn" {
-  description = "ARN of the IAM role for GitHub Actions OIDC. Set as secret AWS_ROLE_ARN in the repo."
+  description = "ARN of the IAM role for GitHub Actions (build-push to ECR). Set as secret AWS_ROLE_ARN in the repo."
   value       = aws_iam_role.github_actions_ecr.arn
+}
+
+output "github_actions_terraform_role_arn" {
+  description = "ARN of the IAM role for Terraform workflows. Set as secret TF_AWS_ROLE_ARN in the repo."
+  value       = aws_iam_role.github_actions_terraform.arn
 }
 
 # output "vpc_id" {

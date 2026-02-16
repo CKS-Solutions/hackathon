@@ -331,8 +331,13 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
 
 2. **GitHub — Secrets e Variables**  
    No repositório (Settings → Secrets and variables → Actions):
-   - **Secret:** `AWS_ROLE_ARN` = valor do output `github_actions_role_arn`.
-   - **Variables:** `AWS_REGION` (ex.: `us-east-1`), `ECR_MS_AUTH_URL`, `ECR_MS_VIDEO_URL`, `ECR_MS_NOTIFY_URL` = URLs do output `ecr_repository_urls` (uma por serviço). Não commitar secrets; OIDC evita chaves de longa duração.
+   - **Secrets:**  
+     - `AWS_ROLE_ARN` = output `github_actions_role_arn` (role só para build-push no ECR).  
+     - `TF_AWS_ROLE_ARN` = output `github_actions_terraform_role_arn` (role para os workflows Terraform plan/apply/destroy).  
+     - `TF_STATE_BUCKET` = nome do bucket S3 do state (para Terraform no CI).
+   - **Variables:** `AWS_REGION` (ex.: `us-east-1`), `TF_STATE_REGION` (região do bucket), `ECR_MS_AUTH_URL`, `ECR_MS_VIDEO_URL`, `ECR_MS_NOTIFY_URL` = URLs do output `ecr_repository_urls`. Não commitar secrets; OIDC evita chaves de longa duração.
+
+   **Nota:** As roles de OIDC são duas: uma para build-push (ECR) e outra para Terraform. A primeira vez que você aplicar o Terraform que cria a role `github-actions-terraform`, rode `terraform apply` **localmente** (credenciais com permissão para criar IAM roles); depois configure o secret `TF_AWS_ROLE_ARN` com o output `github_actions_terraform_role_arn`. A partir daí o CI usa essa role e não é preciso ficar adicionando permissões no `github-oidc.tf` (a role de Terraform usa a managed policy PowerUserAccess).
 
 3. **Disparar o workflow**  
    Dê push na branch principal (ex.: `master`). O workflow faz build, scan (Trivy) e push para o ECR. Em **pull_request** só rodam build e scan (push não é feito).
