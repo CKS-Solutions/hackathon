@@ -16,3 +16,6 @@ github_branch = "master"
 
 # Terraform state bucket — same name as in GitHub secret TF_STATE_BUCKET (for CI S3 permissions)
 terraform_state_bucket = "terraform-hackathon"
+
+# IAM ARNs allowed to use kubectl against the EKS cluster. Get yours: aws sts get-caller-identity --query Arn --output text
+# cluster_access_principal_arns = ["arn:aws:iam::027653366477:user/your-user"]

@@ -38,6 +38,10 @@ resource "aws_eks_cluster" "this" {
     endpoint_public_access  = true
   }
 
+  access_config {
+    authentication_mode = "API_AND_CONFIG_MAP"
+  }
+
   enabled_cluster_log_types = ["api", "audit"]
 
   depends_on = [

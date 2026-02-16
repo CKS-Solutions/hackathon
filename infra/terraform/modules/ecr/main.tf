@@ -3,6 +3,7 @@ resource "aws_ecr_repository" "this" {
 
   name                 = each.key
   image_tag_mutability = var.image_tag_mutability
+  force_delete         = true
 }
 
 resource "aws_ecr_lifecycle_policy" "this" {

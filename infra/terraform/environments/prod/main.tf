@@ -33,3 +33,25 @@ module "eks" {
   node_max_size       = 3
   environment         = var.environment
 }
+
+# EKS Access Entries: quem pode usar kubectl (sem isso dá "server asked for credentials")
+resource "aws_eks_access_entry" "cluster_access" {
+  for_each = toset(var.cluster_access_principal_arns)
+
+  cluster_name  = module.eks.cluster_id
+  principal_arn = each.value
+  type          = "STANDARD"
+}
+
+resource "aws_eks_access_policy_association" "cluster_admin" {
+  for_each = toset(var.cluster_access_principal_arns)
+
+  cluster_name   = module.eks.cluster_id
+  principal_arn  = each.value
+  policy_arn     = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+  access_scope {
+    type = "cluster"
+  }
+
+  depends_on = [aws_eks_access_entry.cluster_access]
+}

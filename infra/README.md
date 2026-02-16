@@ -363,11 +363,18 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
 
 **Pré-requisitos:** Terraform prod com VPC e EKS já aplicados (descomente os módulos vpc e eks em [main.tf](infra/terraform/environments/prod/main.tf) e rode `terraform apply`); imagens no ECR (workflow build-push já rodou); `kubectl` e AWS CLI instalados.
 
+**Se `kubectl get nodes` der "server has asked for the client to provide credentials":** o seu IAM (user/role) ainda não está autorizado no cluster. Adicione o ARN em [terraform.tfvars](infra/terraform/environments/prod/terraform.tfvars) como `cluster_access_principal_arns = ["arn:aws:iam::ACCOUNT:user/SEU_USER"]` (obtenha com `aws sts get-caller-identity --query Arn --output text`) e rode `terraform apply` (local ou pelo CI). Depois disso, `kubectl get nodes` deve funcionar.
+
 1. **Configurar kubeconfig**  
-   Conecte o `kubectl` ao cluster EKS prod (use o nome do cluster e a região do seu Terraform):
+   Conecte o `kubectl` ao cluster EKS prod (use o nome do cluster e a região do seu Terraform). Suas credenciais AWS precisam estar ativas (`aws sts get-caller-identity` deve funcionar).
    ```bash
    aws eks update-kubeconfig --region us-east-1 --name hackathon-prod
    ```
+   Confirme que a conexão funciona antes de aplicar (evita o erro "server has asked for the client to provide credentials"):
+   ```bash
+   kubectl get nodes
+   ```
+   Se der erro de credenciais: verifique `AWS_PROFILE` ou `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`; use a mesma conta/região do Terraform que criou o cluster.
 
 2. **Ajustar URLs do ECR no overlay prod**  
    Se a sua conta/região for diferente, edite as imagens nos arquivos:

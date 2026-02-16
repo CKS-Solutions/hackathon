@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "environment" {
   description = "Environment name (e.g. dev, prod)."
   type        = string
-  default     = "dev"
+  default     = "prod"
 }
 
 variable "availability_zones" {
@@ -53,4 +53,10 @@ variable "github_branch" {
 variable "terraform_state_bucket" {
   description = "S3 bucket name for Terraform state (used by GitHub Actions to read/write state)."
   type        = string
+}
+
+variable "cluster_access_principal_arns" {
+  description = "IAM principal ARNs (user or role) to grant EKS cluster access (kubectl). Get yours with: aws sts get-caller-identity --query Arn --output text. Set in terraform.tfvars (não commitar)."
+  type        = list(string)
+  default     = []
 }
