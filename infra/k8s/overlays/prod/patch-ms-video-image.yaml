@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms-video
+spec:
+  template:
+    spec:
+      containers:
+        - name: ms-video
+          image: 027653366477.dkr.ecr.us-east-1.amazonaws.com/ms-video:latest
+          imagePullPolicy: Always

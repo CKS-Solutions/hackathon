@@ -76,7 +76,7 @@ O sistema roda na **AWS**, com o cluster **Kubernetes (EKS)** orquestrando os mi
 
 ### 2.5 GitOps (Argo CD + Kustomize)
 
-- **Kustomize:** organiza bases e overlays (ex.: `dev`, `staging`, `prod`) para os manifests do EKS (Deployments, Services, Ingress, etc.).
+- **Kustomize:** organiza bases e overlay **prod** para o EKS (Deployments, Services, Ingress, etc.). O overlay **dev** existe apenas para testes em cluster local (kind/minikube).
 - **Argo CD** aponta para o repositório (pasta de manifests/Kustomize) e mantém o cluster alinhado ao Git. Deploys e rollbacks passam por commit/PR, com histórico e auditoria.
 
 ---
@@ -99,7 +99,7 @@ O sistema roda na **AWS**, com o cluster **Kubernetes (EKS)** orquestrando os mi
 | **Cloud** | AWS | Requisito; ecossistema EKS, ECR, RDS, S3 bem integrado. |
 | **Orquestração** | Kubernetes (EKS) | Escalabilidade, padrão para microsserviços, alinhado ao hackathon. |
 | **IaC (cloud)** | Terraform (ou OpenTofu) | Provisionar VPC, EKS, ECR, RDS, S3, IAM de forma versionada e reproduzível. |
-| **Manifests K8s** | Kustomize | Bases reutilizáveis + overlays por ambiente (dev/staging/prod) sem duplicar YAML. |
+| **Manifests K8s** | Kustomize | Bases reutilizáveis + overlay prod para EKS (dev só para cluster local). |
 | **CD** | Argo CD (GitOps) | Estado desejado no Git; reconciliação contínua; rollback por revert de commit. |
 | **CI** | GitHub Actions | Integração nativa com o repositório; build, test e push para ECR. |
 | **Mensageria** | RabbitMQ | Atende “RabbitMQ, Kafka ou similar”; simples de operar no K8s; filas e exchanges bem definidas. |
@@ -142,6 +142,8 @@ infra/
 ## 6. Plano de entregas incrementais
 
 Cada entrega é **pequena**, **testável** e prepara a próxima. Você pode validar em ambiente local (ex.: kind/minikube) antes de usar EKS.
+
+**Escopo do hackathon:** uso apenas do ambiente **prod** na AWS (EKS, ECR, etc.). Não há staging; deploys e pipelines de infra apontam direto para prod. O overlay **dev** em Kustomize existe só para rodar em cluster local (Entrega 2); o deploy no EKS usa somente o overlay **prod**.
 
 ---
 
@@ -238,17 +240,17 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
 
 ---
 
-### Entrega 3 — Terraform: VPC e EKS (dev)
+### Entrega 3 — Terraform: VPC e EKS
 
 **Objetivo:** Provisionar **VPC** e **cluster EKS** na AWS com Terraform, sem ainda deployar a aplicação.
 
 - Criar **infra/terraform/modules/vpc** (subnets públicas/privadas, NAT, etc.).
 - Criar **infra/terraform/modules/eks** (cluster, node group, OIDC para IRSA se for usar depois).
-- Criar **infra/terraform/environments/dev** que usa esses módulos e chama o provider AWS.
+- Usar **infra/terraform/environments/prod** (ou dev para testes opcionais) com esses módulos e provider AWS.
 - Configurar **backend remoto** S3 para o state (sem DynamoDB neste escopo).
 - Executar `terraform plan` / `terraform apply` e conectar `kubectl` ao EKS (update kubeconfig).
 
-**Critério de sucesso:** EKS criado; `kubectl get nodes` mostra os nodes do cluster em dev.
+**Critério de sucesso:** EKS criado; `kubectl get nodes` mostra os nodes do cluster. No hackathon o ambiente alvo é **prod**.
 
 #### Como rodar a Entrega 3
 
@@ -333,7 +335,7 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
    - **Variables:** `AWS_REGION` (ex.: `us-east-1`), `ECR_MS_AUTH_URL`, `ECR_MS_VIDEO_URL`, `ECR_MS_NOTIFY_URL` = URLs do output `ecr_repository_urls` (uma por serviço). Não commitar secrets; OIDC evita chaves de longa duração.
 
 3. **Disparar o workflow**  
-   Dê push na branch principal (ex.: `main`). O workflow faz build, scan (Trivy) e push para o ECR. Em **pull_request** só rodam build e scan (push não é feito).
+   Dê push na branch principal (ex.: `master`). O workflow faz build, scan (Trivy) e push para o ECR. Em **pull_request** só rodam build e scan (push não é feito).
 
 4. **Validar**  
    No console AWS (ECR), confira os repositórios ms-auth, ms-video e ms-notify com imagens tagadas pelo **SHA** do commit e por **latest**.
@@ -344,13 +346,54 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
 
 ### Entrega 5 — Deploy no EKS (kubectl / Kustomize)
 
-**Objetivo:** Rodar a aplicação no **EKS** usando os manifests Kustomize, com imagens do ECR.
+**Objetivo:** Rodar a aplicação no **EKS** usando os manifests Kustomize, com imagens do ECR. Deploy direto em **prod** (sem staging).
 
-- Ajustar **overlays** (ex.: criar **overlays/staging** ou usar **dev** com imagens ECR) para apontar para as imagens no ECR.
-- Configurar **kubeconfig** no CI (ou usar um runner com acesso ao cluster) e aplicar: `kubectl apply -k infra/k8s/overlays/dev` (ou equivalente).
-- Garantir **Secrets** (JWT, DB, RabbitMQ, etc.) no cluster — inicialmente pode ser Secrets manuais ou gerados pelo pipeline.
+- Criar ou ajustar o overlay **infra/k8s/overlays/prod** para apontar para as imagens no ECR (ms-auth, ms-video, ms-notify).
+- Configurar **kubeconfig** (local ou no CI) para o cluster EKS prod e aplicar: `kubectl apply -k infra/k8s/overlays/prod`.
+- Garantir **Secrets** (JWT, DB, RabbitMQ, etc.) no cluster — inicialmente Secrets manuais ou gerados pelo pipeline.
 
-**Critério de sucesso:** Aplicação rodando no EKS; endpoints acessíveis via ALB ou port-forward.
+**Critério de sucesso:** Aplicação rodando no EKS prod; endpoints acessíveis via port-forward (Ingress/ALB na Entrega 6).
+
+#### Como rodar a Entrega 5
+
+**Pré-requisitos:** Terraform prod com VPC e EKS já aplicados (descomente os módulos vpc e eks em [main.tf](infra/terraform/environments/prod/main.tf) e rode `terraform apply`); imagens no ECR (workflow build-push já rodou); `kubectl` e AWS CLI instalados.
+
+1. **Configurar kubeconfig**  
+   Conecte o `kubectl` ao cluster EKS prod (use o nome do cluster e a região do seu Terraform):
+   ```bash
+   aws eks update-kubeconfig --region us-east-1 --name hackathon-prod
+   ```
+
+2. **Ajustar URLs do ECR no overlay prod**  
+   Se a sua conta/região for diferente, edite as imagens nos arquivos:
+   - [infra/k8s/overlays/prod/patch-ms-auth-image.yaml](infra/k8s/overlays/prod/patch-ms-auth-image.yaml)
+   - [infra/k8s/overlays/prod/patch-ms-video-image.yaml](infra/k8s/overlays/prod/patch-ms-video-image.yaml)
+   - [infra/k8s/overlays/prod/patch-ms-notify-image.yaml](infra/k8s/overlays/prod/patch-ms-notify-image.yaml)  
+   Use as URLs dos outputs do Terraform (`ecr_repository_urls`) ou as variáveis do GitHub (ECR_MS_AUTH_URL, etc.).
+
+3. **Aplicar os manifests**  
+   Na raiz do repositório:
+   ```bash
+   kubectl apply -k infra/k8s/overlays/prod
+   ```
+
+4. **Verificar**  
+   Os pods devem ficar Running no namespace `video-system`:
+   ```bash
+   kubectl get pods -n video-system
+   kubectl get svc -n video-system
+   ```
+   Para testar um endpoint (port-forward no ms-auth):
+   ```bash
+   kubectl port-forward -n video-system svc/ms-auth 8081:8080
+   curl -s http://localhost:8081/
+   ```
+   Esperado (stub): `{"service":"ms-auth"}`.
+
+5. **Secrets (quando integrar serviços reais)**  
+   Os stubs não dependem de Secrets. Quando usar ms-auth/ms-video/ms-notify reais com JWT, Postgres e RabbitMQ, crie os secrets manualmente; veja exemplos em [infra/k8s/overlays/prod/secrets.example.yaml](infra/k8s/overlays/prod/secrets.example.yaml).
+
+**Rollback:** Reverter o overlay (git revert) e rodar `kubectl apply -k infra/k8s/overlays/prod` de novo; ou alterar a tag da imagem nos patches (ex.: `:latest` → `:<sha-anterior>`) e reaplicar.
 
 ---
 
@@ -360,9 +403,9 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
 
 - Adicionar no Kustomize o **Ingress** (e IngressClass se necessário) para ms-auth, ms-video e ms-notify.
 - Instalar e configurar **AWS Load Balancer Controller** (ou outro Ingress controller) no EKS via Terraform ou Helm.
-- Configurar DNS (opcional para dev: usar o hostname do ALB).
+- Configurar DNS (opcional: usar o hostname do ALB em prod).
 
-**Critério de sucesso:** Acesso aos serviços via URL do ALB (ou domínio apontando para o ALB).
+**Critério de sucesso:** Acesso aos serviços em prod via URL do ALB (ou domínio apontando para o ALB).
 
 ---
 
@@ -371,7 +414,7 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
 **Objetivo:** Deploy e atualização da aplicação via **Argo CD**, usando o repositório como fonte da verdade.
 
 - Instalar **Argo CD** no EKS (Helm ou manifest oficial).
-- Registrar **Application** apontando para o repositório (pasta **infra/k8s**) e o overlay (ex.: dev/prod). Argo CD usa Kustomize nativamente.
+- Registrar **Application** apontando para o repositório (pasta **infra/k8s**) e o overlay **prod**. Argo CD usa Kustomize nativamente.
 - Desligar o apply manual do pipeline para os manifests (o pipeline só builda e faz push das imagens; Argo CD aplica os manifests). Ou manter o pipeline apenas atualizando a tag da imagem no Kustomize (image updater) e deixar o Argo CD reconciliar.
 
 **Critério de sucesso:** Alteração em **infra/k8s** (ex.: nova tag de imagem) é refletida no cluster após sync do Argo CD.

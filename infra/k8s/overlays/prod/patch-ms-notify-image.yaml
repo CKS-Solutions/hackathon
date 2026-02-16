@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms-notify
+spec:
+  template:
+    spec:
+      containers:
+        - name: ms-notify
+          image: 027653366477.dkr.ecr.us-east-1.amazonaws.com/ms-notify:latest
+          imagePullPolicy: Always

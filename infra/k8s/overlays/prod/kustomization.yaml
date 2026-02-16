@@ -1,0 +1,31 @@
+# Overlay prod — EKS com imagens ECR. Ajuste as URLs nos patches com os outputs do Terraform (ecr_repository_urls).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: video-system
+
+resources:
+  - ../../base
+  - namespace.yaml
+
+patches:
+  - path: patch-ms-auth-image.yaml
+    target:
+      kind: Deployment
+      name: ms-auth
+  - path: patch-ms-video-image.yaml
+    target:
+      kind: Deployment
+      name: ms-video
+  - path: patch-ms-notify-image.yaml
+    target:
+      kind: Deployment
+      name: ms-notify
+  - path: patch-rabbitmq-pull-policy.yaml
+    target:
+      kind: Deployment
+      name: rabbitmq
+  - path: patch-postgres-pull-policy.yaml
+    target:
+      kind: Deployment
+      name: postgres
