@@ -1,5 +1,5 @@
 # Build ms-stub and push to ECR (tags: github.sha + latest).
-# Push to ECR only on push to main; on PR we only build and scan.
+# Push to ECR on push to master or workflow_dispatch; on PR we only build and scan.
 
 name: Build and Push to ECR
 
@@ -61,7 +61,7 @@ jobs:
           severity: CRITICAL,HIGH
 
       - name: Tag and push to ECR
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/master') || github.event_name == 'workflow_dispatch'
         env:
           ECR_MS_AUTH_URL: ${{ vars.ECR_MS_AUTH_URL }}
           ECR_MS_VIDEO_URL: ${{ vars.ECR_MS_VIDEO_URL }}
