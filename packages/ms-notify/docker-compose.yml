@@ -1,0 +1,33 @@
+version: "3.9"
+
+services:
+  localstack:
+    image: localstack/localstack:latest
+    container_name: localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=sqs,dynamodb,ses
+      - DEBUG=1
+      - AWS_DEFAULT_REGION=us-east-1
+    volumes:
+      - ./localstack/init.sh:/etc/localstack/init/ready.d/init.sh
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  app:
+    build:
+      context: ./app
+    container_name: golang-app
+    depends_on:
+      - localstack
+    ports:
+      - "8080:8080"
+    environment:
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_ENDPOINT_URL=http://localstack:4566
+      - SQS_QUEUE_URL=http://localstack:4566/000000000000/MSNotify-Queue
+      # - SQS_DLQ_URL=http://localstack:4566/000000000000/MSNotify-DLQueue
+      - DYNAMODB_TABLE=MSNotify.Notification
+      - SES_SENDER=cks.hackathon.noreply@gmail.com

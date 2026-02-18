@@ -1,0 +1,41 @@
+# Arquivos Git
+.git
+.gitignore
+
+# Dependências
+vendor/
+
+# Binários
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+app
+main
+
+# Arquivos de teste
+*.test
+*.out
+coverage.txt
+coverage.html
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+
+# Arquivos temporários
+*.tmp
+*.log
+
+# Docker
+.dockerignore
+docker-compose.yml
+Dockerfile
