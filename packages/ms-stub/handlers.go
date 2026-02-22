@@ -6,9 +6,10 @@ import (
 )
 
 // handleRoot returns 200 with a JSON body containing the service name (from SERVICE_NAME env).
+// Accepts GET on any path so path-based Ingress (e.g. /auth, /video, /notify) works without rewrite.
 func handleRoot(serviceName string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" || r.Method != http.MethodGet {
+		if r.Method != http.MethodGet {
 			http.NotFound(w, r)
 			return
 		}

@@ -432,10 +432,10 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
    cd infra/terraform/environments/prod
    terraform plan && terraform apply
    ```
-   Anote o output **lb_controller_role_arn** (será usado no Helm).
+   Anote os outputs **lb_controller_role_arn** e **vpc_id** (serão usados no Helm).
 
 2. **Instalar o AWS Load Balancer Controller (Helm)**  
-   Adicione o repositório e instale o chart com o nome do cluster e a role IRSA:
+   Adicione o repositório e instale o chart com o nome do cluster, a role IRSA e o **VPC ID**. Informar o VPC ID evita que o controller use o instance metadata (que pode falhar por timeout em redes privadas ou IMDSv2):
    ```bash
    helm repo add eks https://aws.github.io/eks-charts
    helm repo update
@@ -444,9 +444,10 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
      --set clusterName=<CLUSTER_NAME> \
      --set serviceAccount.create=true \
      --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=<LB_CONTROLLER_ROLE_ARN> \
-     --set region=<AWS_REGION>
+     --set region=<AWS_REGION> \
+     --set vpcId=<VPC_ID>
    ```
-   Substitua `<CLUSTER_NAME>` pelo nome do cluster (ex.: `hackathon-prod`), `<LB_CONTROLLER_ROLE_ARN>` pelo output `lb_controller_role_arn` do Terraform e `<AWS_REGION>` pela região (ex.: `us-east-1`). Aguarde os pods do controller ficarem Running: `kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller`.
+   Substitua `<CLUSTER_NAME>` pelo nome do cluster (ex.: `hackathon-prod`), `<LB_CONTROLLER_ROLE_ARN>` pelo output `lb_controller_role_arn`, `<AWS_REGION>` pela região (ex.: `us-east-1`) e `<VPC_ID>` pelo output `vpc_id` do Terraform (ex.: `terraform output -raw vpc_id`). Aguarde os pods do controller ficarem Running: `kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller`.
 
 3. **Aplicar o overlay (Ingress + IngressClass)**  
    Na raiz do repositório:

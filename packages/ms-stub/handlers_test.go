@@ -18,7 +18,7 @@ func TestHandleRoot(t *testing.T) {
 	}{
 		{"ok with service name", "ms-auth", "/", "GET", http.StatusOK, "ms-auth"},
 		{"ok default", "ms-stub", "/", "GET", http.StatusOK, "ms-stub"},
-		{"not found wrong path", "ms-auth", "/other", "GET", http.StatusNotFound, ""},
+		{"ok path for ingress", "ms-notify", "/notify", "GET", http.StatusOK, "ms-notify"},
 		{"not found wrong method", "ms-auth", "/", "POST", http.StatusNotFound, ""},
 	}
 	for _, tt := range tests {
