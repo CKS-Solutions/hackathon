@@ -61,7 +61,7 @@ jobs:
           severity: CRITICAL,HIGH
 
       - name: Tag and push to ECR
-        if: (github.event_name == 'push' && github.ref == 'refs/heads/master') || github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch'
         env:
           ECR_MS_AUTH_URL: ${{ vars.ECR_MS_AUTH_URL }}
           ECR_MS_VIDEO_URL: ${{ vars.ECR_MS_VIDEO_URL }}
