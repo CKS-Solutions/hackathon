@@ -145,6 +145,8 @@ Cada entrega é **pequena**, **testável** e prepara a próxima. Você pode vali
 
 **Escopo do hackathon:** uso apenas do ambiente **prod** na AWS (EKS, ECR, etc.). Não há staging; deploys e pipelines de infra apontam direto para prod. O overlay **dev** em Kustomize existe só para rodar em cluster local (Entrega 2); o deploy no EKS usa somente o overlay **prod**.
 
+**Pré-requisito obrigatório antes de rodar o projeto (Terraform ou pipelines):** As pipelines de Terraform (plan/apply/destroy) usam um **IAM user** com access key, e não OIDC, para permitir rodar destroy e apply em sequência pelo CI sem passo local. Você deve **criar um IAM user** na AWS (ex.: `github-terraform-ci`) com permissão para aplicar/destruir a infra (recomendado: policy **AdministratorAccess** no escopo do hackathon), gerar uma **access key** e configurar no repositório (Settings → Secrets and variables → Actions) os **Secrets** `AWS_ACCESS_KEY_ID` e `AWS_SECRET_ACCESS_KEY`. Sem isso, os workflows de Terraform no CI falham ao obter credenciais. O build-push (ECR) continua usando OIDC (secret `AWS_ROLE_ARN`), criado após o primeiro apply do Terraform.
+
 ---
 
 ### Entrega 1 — Fundação local (Docker + Compose)
@@ -331,13 +333,13 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
 
 2. **GitHub — Secrets e Variables**  
    No repositório (Settings → Secrets and variables → Actions):
-   - **Secrets:**  
-     - `AWS_ROLE_ARN` = output `github_actions_role_arn` (role só para build-push no ECR).  
-     - `TF_AWS_ROLE_ARN` = output `github_actions_terraform_role_arn` (role para os workflows Terraform plan/apply/destroy).  
+   - **Secrets (obrigatórios antes de rodar as pipelines):**
+     - `AWS_ACCESS_KEY_ID` e `AWS_SECRET_ACCESS_KEY` = access key de um **IAM user** usado pelas pipelines de Terraform (plan/apply/destroy). Crie o user no console AWS (ex.: nome `github-terraform-ci`), anexe a policy **AdministratorAccess** (ou equivalente) e gere uma access key; guarde o ID e o secret nos dois secrets. Assim o CI consegue rodar destroy e, em seguida, apply sem passo local.
+     - `AWS_ROLE_ARN` = output `github_actions_role_arn` (role para build-push no ECR, criada pelo Terraform; configure após o primeiro apply).
      - `TF_STATE_BUCKET` = nome do bucket S3 do state (para Terraform no CI).
-   - **Variables:** `AWS_REGION` (ex.: `us-east-1`), `TF_STATE_REGION` (região do bucket), `ECR_MS_AUTH_URL`, `ECR_MS_VIDEO_URL`, `ECR_MS_NOTIFY_URL` = URLs do output `ecr_repository_urls`. Não commitar secrets; OIDC evita chaves de longa duração.
+   - **Variables:** `AWS_REGION` (ex.: `us-east-1`), `TF_STATE_REGION` (região do bucket), `ECR_MS_AUTH_URL`, `ECR_MS_VIDEO_URL`, `ECR_MS_NOTIFY_URL` = URLs do output `ecr_repository_urls`.
 
-   **Nota:** As roles de OIDC são duas: uma para build-push (ECR) e outra para Terraform. A primeira vez que você aplicar o Terraform que cria a role `github-actions-terraform`, rode `terraform apply` **localmente** (credenciais com permissão para criar IAM roles); depois configure o secret `TF_AWS_ROLE_ARN` com o output `github_actions_terraform_role_arn`. A partir daí o CI usa essa role e não é preciso ficar adicionando permissões no `github-oidc.tf` (a role de Terraform usa a managed policy PowerUserAccess).
+   **Resumo:** Terraform no CI usa IAM user (access key); build-push usa OIDC (role `AWS_ROLE_ARN`). Não commitar secrets.
 
 3. **Disparar o workflow**  
    Dê push na branch principal (ex.: `master`). O workflow faz build, scan (Trivy) e push para o ECR. Em **pull_request** só rodam build e scan (push não é feito).

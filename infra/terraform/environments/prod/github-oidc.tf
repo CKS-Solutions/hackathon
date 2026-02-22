@@ -1,6 +1,5 @@
-# OIDC + IAM for GitHub Actions (push to ECR without long-lived credentials)
-
-data "aws_caller_identity" "current" {}
+# OIDC + IAM for GitHub Actions (push to ECR without long-lived credentials).
+# Terraform no CI usa IAM user (access key); esta role é só para build-push.
 
 data "tls_certificate" "github" {
   url = "https://token.actions.githubusercontent.com"
@@ -71,59 +70,4 @@ resource "aws_iam_role_policy" "github_actions_ecr" {
   name   = "ecr-push"
   role   = aws_iam_role.github_actions_ecr.id
   policy = data.aws_iam_policy_document.github_actions_ecr.json
-}
-
-# Role só para Terraform (plan/apply/destroy). PowerUserAccess cobre a maioria dos recursos;
-# IAM não está incluído, então precisamos de uma policy extra só para OIDC provider e roles.
-resource "aws_iam_role" "github_actions_terraform" {
-  name               = "github-actions-terraform"
-  assume_role_policy = data.aws_iam_policy_document.github_oidc_assume.json
-}
-
-resource "aws_iam_role_policy_attachment" "terraform_power_user" {
-  role       = aws_iam_role.github_actions_terraform.name
-  policy_arn = "arn:aws:iam::aws:policy/PowerUserAccess"
-}
-
-data "aws_iam_policy_document" "terraform_iam_oidc_and_roles" {
-  # OIDC provider (GitHub e o que o EKS cria para IRSA)
-  statement {
-    sid    = "TerraformOIDC"
-    effect = "Allow"
-    actions = [
-      "iam:GetOpenIDConnectProvider",
-      "iam:CreateOpenIDConnectProvider",
-      "iam:DeleteOpenIDConnectProvider",
-      "iam:UpdateOpenIDConnectProviderThumbprint",
-      "iam:ListOpenIDConnectProviderTags",
-      "iam:ListOpenIDConnectProviders"
-    ]
-    resources = ["*"]
-  }
-
-  # Roles: GitHub Actions (estas duas) + roles que o módulo EKS cria (cluster, node group)
-  statement {
-    sid    = "TerraformRoles"
-    effect = "Allow"
-    actions = [
-      "iam:GetRole",
-      "iam:CreateRole",
-      "iam:DeleteRole",
-      "iam:PassRole",
-      "iam:PutRolePolicy",
-      "iam:DeleteRolePolicy",
-      "iam:GetRolePolicy",
-      "iam:ListRolePolicies",
-      "iam:ListAttachedRolePolicies",
-      "iam:AttachRolePolicy",
-      "iam:DetachRolePolicy"
-    ]
-    resources = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/*"]
-  }
-}
-
-resource "aws_iam_role_policy" "terraform_iam_oidc_and_roles" {
-  name   = "terraform-iam-oidc-and-roles"
-  role   = aws_iam_role.github_actions_terraform.id
-  policy = data.aws_iam_policy_document.terraform_iam_oidc_and_roles.json
 }
