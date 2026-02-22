@@ -18,4 +18,4 @@ github_branch = "master"
 terraform_state_bucket = "terraform-hackathon"
 
 # IAM ARNs allowed to use kubectl against the EKS cluster. Get yours: aws sts get-caller-identity --query Arn --output text
-# cluster_access_principal_arns = ["arn:aws:iam::027653366477:user/your-user"]
+# cluster_access_principal_arns = ["arn:aws:iam::027653366477:user/kenzo"]
