@@ -7,7 +7,6 @@ namespace: video-system
 resources:
   - ../../base
   - namespace.yaml
-  - ingressclass.yaml
   - ingress.yaml
 
 patches:
