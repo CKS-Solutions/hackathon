@@ -7,6 +7,8 @@ namespace: video-system
 resources:
   - ../../base
   - namespace.yaml
+  - ingressclass.yaml
+  - ingress.yaml
 
 patches:
   - path: patch-ms-auth-image.yaml

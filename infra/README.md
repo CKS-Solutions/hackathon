@@ -413,13 +413,65 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
 
 ### Entrega 6 — Ingress e ALB na AWS
 
-**Objetivo:** Expor os serviços via **Ingress** e **ALB** (controller AWS Load Balancer ou nginx-ingress).
+**Objetivo:** Expor os serviços via **Ingress** e **ALB** (AWS Load Balancer Controller).
 
-- Adicionar no Kustomize o **Ingress** (e IngressClass se necessário) para ms-auth, ms-video e ms-notify.
-- Instalar e configurar **AWS Load Balancer Controller** (ou outro Ingress controller) no EKS via Terraform ou Helm.
-- Configurar DNS (opcional: usar o hostname do ALB em prod).
+- Ingress e IngressClass no overlay prod (path-based: `/auth`, `/video`, `/notify`).
+- Terraform: tags nas subnets para descoberta do ALB; IRSA (IAM role) para o controller.
+- Instalar o **AWS Load Balancer Controller** no EKS via Helm (documentado abaixo).
+- DNS (opcional): usar o hostname do ALB em prod ou apontar um domínio Route53 para o ALB.
 
-**Critério de sucesso:** Acesso aos serviços em prod via URL do ALB (ou domínio apontando para o ALB).
+**Critério de sucesso:** Acesso aos serviços em prod via URL do ALB (ex.: `https://<alb-dns>/auth`).
+
+#### Como rodar a Entrega 6
+
+**Pré-requisitos:** Entrega 5 aplicada (Terraform com VPC + EKS; overlay prod aplicado no cluster); `kubectl` e `helm` instalados; kubeconfig apontando para o cluster prod.
+
+1. **Terraform (tags + IRSA)**  
+   O ambiente prod já inclui subnet tags (quando `cluster_name` é passado ao módulo VPC) e a role IRSA para o controller. Rode apply se ainda não aplicou:
+   ```bash
+   cd infra/terraform/environments/prod
+   terraform plan && terraform apply
+   ```
+   Anote o output **lb_controller_role_arn** (será usado no Helm).
+
+2. **Instalar o AWS Load Balancer Controller (Helm)**  
+   Adicione o repositório e instale o chart com o nome do cluster e a role IRSA:
+   ```bash
+   helm repo add eks https://aws.github.io/eks-charts
+   helm repo update
+   helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
+     -n kube-system \
+     --set clusterName=<CLUSTER_NAME> \
+     --set serviceAccount.create=true \
+     --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=<LB_CONTROLLER_ROLE_ARN> \
+     --set region=<AWS_REGION>
+   ```
+   Substitua `<CLUSTER_NAME>` pelo nome do cluster (ex.: `hackathon-prod`), `<LB_CONTROLLER_ROLE_ARN>` pelo output `lb_controller_role_arn` do Terraform e `<AWS_REGION>` pela região (ex.: `us-east-1`). Aguarde os pods do controller ficarem Running: `kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller`.
+
+3. **Aplicar o overlay (Ingress + IngressClass)**  
+   Na raiz do repositório:
+   ```bash
+   kubectl apply -k infra/k8s/overlays/prod
+   ```
+   O Ingress `video-system` e a IngressClass `alb` serão criados; o controller criará o ALB e os target groups.
+
+4. **Obter a URL do ALB e testar**  
+   O endereço do ALB pode levar alguns minutos para aparecer. Liste o Ingress:
+   ```bash
+   kubectl get ingress -n video-system
+   ```
+   Use o hostname em ADDRESS (ou no console AWS, em EC2 → Load Balancers). Teste:
+   ```bash
+   curl -s http://<alb-hostname>/auth
+   curl -s http://<alb-hostname>/video
+   curl -s http://<alb-hostname>/notify
+   ```
+   (Se o ALB estiver com listener HTTPS apenas, use `https://` e `-k` se o certificado for inválido.) Esperado com stubs: resposta JSON do serviço (ex.: `{"service":"ms-auth"}`).
+
+5. **DNS (opcional)**  
+   Para usar um domínio próprio, crie um registro CNAME no Route53 (ou outro DNS) apontando para o hostname do ALB.
+
+**Rollback:** Remover o Ingress do overlay (`kustomization.yaml` e arquivos `ingress.yaml`/`ingressclass.yaml`) e reaplicar; o controller removerá o ALB. Para desinstalar o controller: `helm uninstall aws-load-balancer-controller -n kube-system`.
 
 ---
 

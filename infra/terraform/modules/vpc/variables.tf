@@ -19,3 +19,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "cluster_name" {
+  description = "EKS cluster name; when set, public/private subnets get tags for AWS Load Balancer Controller discovery."
+  type        = string
+  default     = null
+}

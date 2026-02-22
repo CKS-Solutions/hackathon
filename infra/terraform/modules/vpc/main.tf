@@ -22,4 +22,14 @@ module "vpc" {
   enable_dns_support   = true
 
   tags = var.tags
+
+  # AWS Load Balancer Controller discovers subnets by these tags (Entrega 6).
+  public_subnet_tags = var.cluster_name != null ? {
+    "kubernetes.io/role/elb"                    = "1"
+    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+  } : {}
+  private_subnet_tags = var.cluster_name != null ? {
+    "kubernetes.io/role/internal-elb"           = "1"
+    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+  } : {}
 }

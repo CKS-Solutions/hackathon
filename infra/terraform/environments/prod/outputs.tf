@@ -8,6 +8,11 @@ output "github_actions_role_arn" {
   value       = aws_iam_role.github_actions_ecr.arn
 }
 
+output "lb_controller_role_arn" {
+  description = "ARN of the IAM role for AWS Load Balancer Controller (IRSA). Use for Helm install: serviceAccount.annotations.eks.amazonaws.com/role-arn."
+  value       = aws_iam_role.lb_controller.arn
+}
+
 # output "vpc_id" {
 #   description = "ID of the VPC."
 #   value       = module.vpc.vpc_id
