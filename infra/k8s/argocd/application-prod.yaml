@@ -1,0 +1,22 @@
+# Application para o overlay prod. O repositório é público; branch master.
+# Aplicar uma vez (após instalar o Argo CD): kubectl apply -f infra/k8s/argocd/application-prod.yaml
+# Substitua <REPO_URL> pela URL HTTPS do repositório (ex.: https://github.com/org/hackathon.git)
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: video-system-prod
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/CKS-Solutions/hackathon
+    path: infra/k8s/overlays/prod
+    targetRevision: master
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: video-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

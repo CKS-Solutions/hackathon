@@ -356,7 +356,7 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
 **Objetivo:** Rodar a aplicação no **EKS** usando os manifests Kustomize, com imagens do ECR. Deploy direto em **prod** (sem staging).
 
 - Criar ou ajustar o overlay **infra/k8s/overlays/prod** para apontar para as imagens no ECR (ms-auth, ms-video, ms-notify).
-- Configurar **kubeconfig** (local ou no CI) para o cluster EKS prod e aplicar: `kubectl apply -k infra/k8s/overlays/prod`.
+- Configurar **kubeconfig** (local ou no CI) para o cluster EKS prod. O deploy dos manifests em prod é feito pelo **Argo CD** (ver Entrega 7). Para um primeiro deploy antes de instalar o Argo CD, você pode aplicar manualmente: `kubectl apply -k infra/k8s/overlays/prod`.
 - Garantir **Secrets** (JWT, DB, RabbitMQ, etc.) no cluster — inicialmente Secrets manuais ou gerados pelo pipeline.
 
 **Critério de sucesso:** Aplicação rodando no EKS prod; endpoints acessíveis via port-forward (Ingress/ALB na Entrega 6).
@@ -385,8 +385,8 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
    - [infra/k8s/overlays/prod/patch-ms-notify-image.yaml](infra/k8s/overlays/prod/patch-ms-notify-image.yaml)  
    Use as URLs dos outputs do Terraform (`ecr_repository_urls`) ou as variáveis do GitHub (ECR_MS_AUTH_URL, etc.).
 
-3. **Aplicar os manifests**  
-   Na raiz do repositório:
+3. **Aplicar os manifests (bootstrap inicial)**  
+   Com a **Entrega 7** (Argo CD), o deploy em prod é feito pelo Argo CD a partir do Git; não é necessário rodar este comando após configurar o Argo CD. Se você ainda não instalou o Argo CD, aplique os manifests uma vez na raiz do repositório:
    ```bash
    kubectl apply -k infra/k8s/overlays/prod
    ```
@@ -407,7 +407,7 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
 5. **Secrets (quando integrar serviços reais)**  
    Os stubs não dependem de Secrets. Quando usar ms-auth/ms-video/ms-notify reais com JWT, Postgres e RabbitMQ, crie os secrets manualmente; veja exemplos em [infra/k8s/overlays/prod/secrets.example.yaml](infra/k8s/overlays/prod/secrets.example.yaml).
 
-**Rollback:** Reverter o overlay (git revert) e rodar `kubectl apply -k infra/k8s/overlays/prod` de novo; ou alterar a tag da imagem nos patches (ex.: `:latest` → `:<sha-anterior>`) e reaplicar.
+**Rollback:** Com Argo CD (Entrega 7), reverta o commit no Git e sincronize a aplicação no Argo CD. Sem Argo CD, reverta o overlay (git revert) e rode `kubectl apply -k infra/k8s/overlays/prod` de novo; ou altere a tag da imagem nos patches e reaplique.
 
 ---
 
@@ -450,7 +450,7 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
    Substitua `<CLUSTER_NAME>` pelo nome do cluster (ex.: `hackathon-prod`), `<LB_CONTROLLER_ROLE_ARN>` pelo output `lb_controller_role_arn`, `<AWS_REGION>` pela região (ex.: `us-east-1`) e `<VPC_ID>` pelo output `vpc_id` do Terraform (ex.: `terraform output -raw vpc_id`). Aguarde os pods do controller ficarem Running: `kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller`.
 
 3. **Aplicar o overlay (Ingress + IngressClass)**  
-   Na raiz do repositório:
+   Com a **Entrega 7** (Argo CD), o overlay (incluindo Ingress) é aplicado pelo Argo CD; não é necessário rodar este comando manualmente. Se você ainda não instalou o Argo CD, aplique uma vez na raiz do repositório:
    ```bash
    kubectl apply -k infra/k8s/overlays/prod
    ```
@@ -472,7 +472,7 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
 5. **DNS (opcional)**  
    Para usar um domínio próprio, crie um registro CNAME no Route53 (ou outro DNS) apontando para o hostname do ALB.
 
-**Rollback:** Remover o Ingress do overlay (`kustomization.yaml` e arquivos `ingress.yaml`/`ingressclass.yaml`) e reaplicar; o controller removerá o ALB. Para desinstalar o controller: `helm uninstall aws-load-balancer-controller -n kube-system`.
+**Rollback:** Com Argo CD, remova o Ingress do overlay no Git e sincronize a aplicação; o controller removerá o ALB. Sem Argo CD, remova do overlay e rode `kubectl apply -k infra/k8s/overlays/prod` de novo. Para desinstalar o controller: `helm uninstall aws-load-balancer-controller -n kube-system`.
 
 ---
 
@@ -481,10 +481,51 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
 **Objetivo:** Deploy e atualização da aplicação via **Argo CD**, usando o repositório como fonte da verdade.
 
 - Instalar **Argo CD** no EKS (Helm ou manifest oficial).
-- Registrar **Application** apontando para o repositório (pasta **infra/k8s**) e o overlay **prod**. Argo CD usa Kustomize nativamente.
-- Desligar o apply manual do pipeline para os manifests (o pipeline só builda e faz push das imagens; Argo CD aplica os manifests). Ou manter o pipeline apenas atualizando a tag da imagem no Kustomize (image updater) e deixar o Argo CD reconciliar.
+- Registrar **Application** apontando para o repositório (pasta **infra/k8s/overlays/prod**). Argo CD usa Kustomize nativamente. Repositório público; branch **master**.
+- A partir desta entrega, **não é necessário** rodar `kubectl apply -k infra/k8s/overlays/prod` manualmente para prod: o Argo CD aplica e reconcilia o estado a partir do Git.
 
 **Critério de sucesso:** Alteração em **infra/k8s** (ex.: nova tag de imagem) é refletida no cluster após sync do Argo CD.
+
+#### Como rodar a Entrega 7
+
+**Pré-requisitos:** Entrega 6 concluída (EKS, AWS Load Balancer Controller e overlay prod aplicado ao menos uma vez); `kubectl` e `helm` instalados; kubeconfig apontando para o cluster prod.
+
+1. **Instalar o Argo CD (Helm)**  
+   Adicione o repositório e instale o chart no namespace `argocd`:
+   ```bash
+   helm repo add argo https://argoproj.github.io/argo-helm
+   helm repo update
+   kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+   helm upgrade --install argocd argo/argo-cd -n argocd
+   ```
+   Aguarde os pods ficarem Running: `kubectl get pods -n argocd`.
+
+2. **Senha inicial do admin**  
+   A senha do usuário `admin` é gerada e armazenada no Secret `argocd-initial-admin-secret`. Para obter:
+   ```bash
+   kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d; echo
+   ```
+
+3. **Acessar a UI**  
+   Por padrão a UI não é exposta publicamente. Use port-forward e acesse `https://localhost:8443` (aceite o certificado autoassinado). Login: `admin` e a senha do passo anterior.
+   ```bash
+   kubectl port-forward svc/argocd-server -n argocd 8443:443
+   ```
+
+4. **Aplicar a Application (overlay prod)**  
+   O repositório é **público** e a branch é **master**. Edite [infra/k8s/argocd/application-prod.yaml](infra/k8s/argocd/application-prod.yaml) e substitua `<REPO_URL>` pela URL HTTPS do seu repositório (ex.: `https://github.com/org/hackathon.git`). Depois aplique a Application uma vez:
+   ```bash
+   kubectl apply -f infra/k8s/argocd/application-prod.yaml
+   ```
+   No Argo CD (UI ou CLI), a aplicação `video-system-prod` aparecerá; o primeiro sync aplicará os recursos do overlay prod no namespace `video-system`. A Application está configurada com sync automático (prune e selfHeal).
+
+5. **Fluxo de deploy a partir da Entrega 7**  
+   O deploy em prod é feito pelo Argo CD a partir do Git. Não é necessário rodar `kubectl apply -k infra/k8s/overlays/prod` manualmente. Para levar uma nova imagem ao cluster: atualize a tag nos patches do overlay prod (ex.: em [patch-ms-auth-image.yaml](infra/k8s/overlays/prod/patch-ms-auth-image.yaml)), faça push no repositório; o Argo CD sincronizará e atualizará os Deployments.
+
+6. **Validar o critério de sucesso**  
+   Faça uma alteração de baixo risco em `infra/k8s/overlays/prod` (ex.: um label ou a tag de uma imagem), dê push, aguarde o sync (ou dispare Sync na UI). Verifique no cluster: `kubectl get deployment -n video-system -o wide` e confirme que a mudança foi aplicada.
+
+**Rollback:** Reverta o commit no Git e sincronize a aplicação no Argo CD (ou aguarde o sync automático). Para desinstalar o Argo CD: `helm uninstall argocd -n argocd`.
 
 ---
 
