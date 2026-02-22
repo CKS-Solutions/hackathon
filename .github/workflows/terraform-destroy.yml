@@ -11,6 +11,10 @@ on:
         required: true
         type: string
 
+concurrency:
+  group: terraform-prod
+  cancel-in-progress: false
+
 env:
   TF_VERSION: '1.9.0'
 

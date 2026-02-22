@@ -13,6 +13,10 @@ on:
   pull_request:
     branches: [master]
 
+concurrency:
+  group: build-push
+  cancel-in-progress: false
+
 env:
   AWS_REGION: ${{ vars.AWS_REGION }}
   IMAGE_NAME: ms-stub

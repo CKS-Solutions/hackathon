@@ -16,6 +16,10 @@ on:
       - '.github/workflows/terraform-apply.yml'
   workflow_dispatch:
 
+concurrency:
+  group: terraform-prod
+  cancel-in-progress: false
+
 env:
   TF_VERSION: '1.9.0'
 
