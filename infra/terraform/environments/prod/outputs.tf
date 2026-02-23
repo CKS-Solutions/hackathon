@@ -53,3 +53,38 @@ output "app_irsa_role_arn" {
   description = "ARN of the IAM role for video-system apps (IRSA). ServiceAccount video-system/app; used by ms-auth, ms-video, ms-notify."
   value       = aws_iam_role.app.arn
 }
+
+output "ms_auth_db_endpoint" {
+  description = "RDS endpoint for ms-auth database. Use for connection string."
+  value       = module.ms_auth_rds.db_instance_endpoint
+}
+
+output "ms_auth_db_address" {
+  description = "RDS hostname for ms-auth database."
+  value       = module.ms_auth_rds.db_instance_address
+}
+
+output "ms_auth_db_port" {
+  description = "RDS port for ms-auth database."
+  value       = module.ms_auth_rds.db_instance_port
+}
+
+output "ms_auth_db_name" {
+  description = "Database name for ms-auth."
+  value       = module.ms_auth_rds.db_name
+}
+
+output "ms_auth_db_secret_arn" {
+  description = "ARN of the Secrets Manager secret containing ms-auth database credentials. Use with External Secrets Operator or direct access from pods."
+  value       = module.ms_auth_rds.secret_arn
+}
+
+output "ms_auth_db_secret_name" {
+  description = "Name of the Secrets Manager secret containing ms-auth database credentials."
+  value       = module.ms_auth_rds.secret_name
+}
+
+output "ms_auth_db_security_group_id" {
+  description = "Security group ID for ms-auth RDS instance."
+  value       = module.ms_auth_rds.security_group_id
+}

@@ -61,6 +61,19 @@ data "aws_iam_policy_document" "app" {
     ]
     resources = ["*"]
   }
+
+  # Secrets Manager: acesso às credenciais do RDS (ms-auth)
+  statement {
+    sid    = "SecretsManager"
+    effect = "Allow"
+    actions = [
+      "secretsmanager:GetSecretValue",
+      "secretsmanager:DescribeSecret"
+    ]
+    resources = [
+      "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:*"
+    ]
+  }
 }
 
 resource "aws_iam_role_policy" "app" {
