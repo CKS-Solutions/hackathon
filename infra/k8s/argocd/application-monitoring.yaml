@@ -18,7 +18,7 @@ spec:
         # Reduzir carga em clusters pequenos (evitar "Too many pods")
         alertmanager:
           enabled: false
-        prometheus-node-exporter:
+        nodeExporter:
           enabled: false
         # Prometheus: descobrir ServiceMonitors em todos os namespaces e sem exigir label release
         prometheus:
