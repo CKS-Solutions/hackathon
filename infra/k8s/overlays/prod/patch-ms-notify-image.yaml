@@ -1,3 +1,4 @@
+# Patch: imagem ECR + env para usar AWS real (não LocalStack). Sem AWS_STAGE o app defaulta para local e tenta localstack:4566.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -9,3 +10,12 @@ spec:
         - name: ms-notify
           image: 027653366477.dkr.ecr.us-east-1.amazonaws.com/ms-notify:latest
           imagePullPolicy: Always
+          env:
+            - name: SERVICE_NAME
+              value: "ms-notify"
+            - name: PORT
+              value: "8080"
+            - name: AWS_STAGE
+              value: "prod"
+            - name: AWS_REGION
+              value: "us-east-1"
