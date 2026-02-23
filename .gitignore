@@ -40,3 +40,6 @@ go.work.sum
 !*.tfvars.example
 backend.hcl
 !backend.hcl.example
+
+# macOS files
+**/.DS_Store
