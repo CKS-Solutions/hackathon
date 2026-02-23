@@ -4,9 +4,6 @@ metadata:
   name: ms-auth
 spec:
   template:
-    metadata:
-      labels:
-        argocd-validated: "true"
     spec:
       containers:
         - name: ms-auth
