@@ -4,5 +4,3 @@ resources:
   - ms-auth
   - ms-video
   - ms-notify
-  - rabbitmq
-  - postgres

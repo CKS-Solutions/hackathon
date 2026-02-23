@@ -23,11 +23,3 @@ patches:
     target:
       kind: Deployment
       name: ms-notify
-  - path: patch-rabbitmq-pull-policy.yaml
-    target:
-      kind: Deployment
-      name: rabbitmq
-  - path: patch-postgres-pull-policy.yaml
-    target:
-      kind: Deployment
-      name: postgres

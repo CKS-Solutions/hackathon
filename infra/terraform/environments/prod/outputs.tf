@@ -1,5 +1,5 @@
 output "ecr_repository_urls" {
-  description = "Map of ECR repository names to URLs. Use these for GitHub Actions variables (ECR_MS_AUTH_URL, etc.)."
+  description = "Map of ECR repository names to full URLs. For GitHub Actions, set ECR_REGISTRY to the registry prefix (e.g. strip /ms-auth from any URL)."
   value       = module.ecr.repository_urls
 }
 
@@ -31,4 +31,20 @@ output "cluster_endpoint" {
 output "kubeconfig_command" {
   description = "Command to update kubeconfig for the EKS cluster."
   value       = "aws eks update-kubeconfig --region ${var.aws_region} --name ${var.cluster_name}"
+}
+
+# ms-notify: use these for Deployment env (ConfigMap/Secret or External Secrets)
+output "ms_notify_sqs_queue_url" {
+  description = "SQS queue URL for ms-notify. Set as env in ms-notify Deployment."
+  value       = module.ms_notify_sqs.queue_url
+}
+
+output "ms_notify_dynamodb_table_name" {
+  description = "DynamoDB table name for ms-notify. Set as env in ms-notify Deployment."
+  value       = module.ms_notify_dynamodb_table.table_name
+}
+
+output "ms_notify_ses_sender_email" {
+  description = "SES verified sender email for ms-notify. Set as env in ms-notify Deployment."
+  value       = module.ms_notify_ses.email
 }

@@ -112,7 +112,7 @@ Os logs mostrarão o processamento das mensagens:
 
 ```bash
 docker exec localstack awslocal dynamodb scan \
-  --table-name Notification \
+  --table-name "MSNotify.Notification" \
   --region us-east-1
 ```
 
@@ -179,6 +179,21 @@ Verifique se a fila foi criada:
 ```bash
 docker exec localstack awslocal sqs list-queues --region us-east-1
 ```
+
+## 🏗️ Infraestrutura (produção)
+
+A IaC para SQS, DynamoDB e SES está em **`infra/terraform`** (não mais em `packages/ms-notify/terraform`):
+
+- **Módulos genéricos:** `infra/terraform/modules/sqs-queue`, `dynamodb-table`, `ses-email-identity`
+- **Prod:** `infra/terraform/environments/prod/ms-notify.tf` instancia os três módulos para o ms-notify
+
+**Variáveis de ambiente em produção:** obtenha os valores com `terraform output` em `infra/terraform/environments/prod`:
+
+- `ms_notify_sqs_queue_url` → env no Deployment (ex.: `SQS_QUEUE_URL`)
+- `ms_notify_dynamodb_table_name` → env no Deployment
+- `ms_notify_ses_sender_email` → env no Deployment
+
+Injeção pode ser manual (ConfigMap/Secret preenchidos a partir dos outputs) ou, futuramente, External Secrets. Para **desenvolvimento local**, use LocalStack e o script `packages/ms-notify/localstack/init.sh` para criar fila, tabela e identidade SES no LocalStack.
 
 ## 📝 Notas de Desenvolvimento
 

@@ -161,7 +161,7 @@ Cada entrega é **pequena**, **testável** e prepara a próxima. Você pode vali
 | **7** | Argo CD instalado no EKS; Application apontando para `infra/k8s/overlays/prod` (branch master, repo público); sync automático — não é mais necessário rodar `kubectl apply -k` para prod. |
 | **8** | Observabilidade: Application Argo CD (Helm) para kube-prometheus-stack no namespace `monitoring`; ms-stub expõe `/metrics`; ServiceMonitor no overlay prod para scrape dos três microsserviços; Grafana acessível por port-forward. |
 
-**Componentes atuais:** VPC, EKS, ECR, IAM (OIDC para ECR + IAM user para Terraform), AWS Load Balancer Controller (Helm), Argo CD (Helm), Applications `video-system-prod` e `monitoring-stack`. A aplicação (ms-auth, ms-video, ms-notify como stubs com `/metrics`) é deployada pelo Argo CD; o stack de observabilidade (Prometheus + Grafana) é instalado via Argo CD a partir do chart Helm.
+**Componentes atuais:** VPC, EKS, ECR, IAM (OIDC para ECR + IAM user para Terraform), AWS Load Balancer Controller (Helm), Argo CD (Helm), Applications `video-system-prod` e `monitoring-stack`. A aplicação (ms-auth, ms-video, ms-notify com imagem real no ECR) é deployada pelo Argo CD; o stack de observabilidade (Prometheus + Grafana) é instalado via Argo CD a partir do chart Helm. Recursos AWS do **ms-notify** (SQS, DynamoDB, SES) estão em `infra/terraform`: módulos genéricos em `modules/sqs-queue`, `dynamodb-table`, `ses-email-identity` e instância em `environments/prod/ms-notify.tf`; use os outputs `ms_notify_sqs_queue_url`, `ms_notify_dynamodb_table_name` e `ms_notify_ses_sender_email` para configurar o Deployment do ms-notify (env ou External Secrets).
 
 #### Passo a passo: levantar tudo após `terraform destroy`
 
@@ -171,7 +171,7 @@ Depois de rodar **terraform destroy** (pela pipeline ou local), para ter o proje
    Garantir que existem no GitHub (Settings → Secrets and variables → Actions):
    - **Secrets:** `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (IAM user para Terraform).
    - **Secret:** `AWS_ROLE_ARN` (será preenchido após o primeiro apply — output `github_actions_role_arn`).
-   - **Variáveis:** `AWS_REGION`, `ECR_MS_AUTH_URL`, `ECR_MS_VIDEO_URL`, `ECR_MS_NOTIFY_URL`, `terraform_state_bucket`, etc., conforme a seção da Entrega 4 e as variáveis do Terraform prod.
+   - **Variáveis:** `AWS_REGION`, `ECR_REGISTRY` (prefixo do ECR, ex.: `123456789012.dkr.ecr.us-east-1.amazonaws.com` — use um item de `ecr_repository_urls` sem o sufixo `/ms-auth`), `terraform_state_bucket`, etc., conforme a seção da Entrega 4.
 
 2. **Terraform apply**  
    Rodar a pipeline **Terraform Apply** (Environment prod) ou, local, `cd infra/terraform/environments/prod && terraform apply`. Isso recria VPC, EKS, ECR, IRSA (ECR), subnet tags, IRSA do Load Balancer Controller, etc. O state fica no S3 (bucket configurado no backend).
@@ -411,7 +411,7 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
      - `AWS_ACCESS_KEY_ID` e `AWS_SECRET_ACCESS_KEY` = access key de um **IAM user** usado pelas pipelines de Terraform (plan/apply/destroy). Crie o user no console AWS (ex.: nome `github-terraform-ci`), anexe a policy **AdministratorAccess** (ou equivalente) e gere uma access key; guarde o ID e o secret nos dois secrets. Assim o CI consegue rodar destroy e, em seguida, apply sem passo local.
      - `AWS_ROLE_ARN` = output `github_actions_role_arn` (role para build-push no ECR, criada pelo Terraform; configure após o primeiro apply).
      - `TF_STATE_BUCKET` = nome do bucket S3 do state (para Terraform no CI).
-   - **Variables:** `AWS_REGION` (ex.: `us-east-1`), `TF_STATE_REGION` (região do bucket), `ECR_MS_AUTH_URL`, `ECR_MS_VIDEO_URL`, `ECR_MS_NOTIFY_URL` = URLs do output `ecr_repository_urls`.
+   - **Variables:** `AWS_REGION` (ex.: `us-east-1`), `TF_STATE_REGION` (região do bucket), `ECR_REGISTRY` = prefixo do registry ECR (ex.: do output `ecr_repository_urls`, use uma URL e remova o sufixo `/ms-auth` — ex.: `123456789012.dkr.ecr.us-east-1.amazonaws.com`). O workflow build-push concatena `ECR_REGISTRY` + nome do serviço (ms-auth, ms-video, ms-notify).
 
    **Resumo:** Terraform no CI usa IAM user (access key); build-push usa OIDC (role `AWS_ROLE_ARN`). Não commitar secrets.
 
@@ -457,7 +457,7 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
    - [infra/k8s/overlays/prod/patch-ms-auth-image.yaml](infra/k8s/overlays/prod/patch-ms-auth-image.yaml)
    - [infra/k8s/overlays/prod/patch-ms-video-image.yaml](infra/k8s/overlays/prod/patch-ms-video-image.yaml)
    - [infra/k8s/overlays/prod/patch-ms-notify-image.yaml](infra/k8s/overlays/prod/patch-ms-notify-image.yaml)  
-   Use as URLs dos outputs do Terraform (`ecr_repository_urls`) ou as variáveis do GitHub (ECR_MS_AUTH_URL, etc.).
+   Use as URLs dos outputs do Terraform (`ecr_repository_urls`). A variável do GitHub para o build-push é `ECR_REGISTRY` (prefixo); a URL completa por serviço é `ECR_REGISTRY/ms-auth`, `ECR_REGISTRY/ms-video`, `ECR_REGISTRY/ms-notify`.
 
 3. **Aplicar os manifests (bootstrap inicial)**  
    Com a **Entrega 7** (Argo CD), o deploy em prod é feito pelo Argo CD a partir do Git; não é necessário rodar este comando após configurar o Argo CD. Se você ainda não instalou o Argo CD, aplique os manifests uma vez na raiz do repositório:
