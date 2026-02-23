@@ -48,3 +48,8 @@ output "ms_notify_ses_sender_email" {
   description = "SES verified sender email for ms-notify. Set as env in ms-notify Deployment."
   value       = module.ms_notify_ses.email
 }
+
+output "ms_notify_irsa_role_arn" {
+  description = "ARN of the IAM role for ms-notify (IRSA). Set as ServiceAccount annotation eks.amazonaws.com/role-arn in video-system namespace."
+  value       = aws_iam_role.ms_notify.arn
+}

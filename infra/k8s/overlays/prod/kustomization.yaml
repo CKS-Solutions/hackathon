@@ -9,6 +9,7 @@ resources:
   - namespace.yaml
   - ingress.yaml
   - servicemonitor-video-system.yaml
+  - sa-ms-notify.yaml
 
 patches:
   - path: patch-ms-auth-image.yaml

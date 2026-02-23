@@ -1,4 +1,4 @@
-# Patch: imagem ECR + env para usar AWS real (não LocalStack). Sem AWS_STAGE o app defaulta para local e tenta localstack:4566.
+# Patch: imagem ECR + env + IRSA ServiceAccount. Sem AWS_STAGE o app defaulta para local e tenta localstack:4566.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -6,6 +6,7 @@ metadata:
 spec:
   template:
     spec:
+      serviceAccountName: ms-notify
       containers:
         - name: ms-notify
           image: 027653366477.dkr.ecr.us-east-1.amazonaws.com/ms-notify:latest
