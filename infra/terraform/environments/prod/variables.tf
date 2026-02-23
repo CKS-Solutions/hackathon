@@ -58,5 +58,5 @@ variable "terraform_state_bucket" {
 variable "cluster_access_principal_arns" {
   description = "IAM principal ARNs (user or role) to grant EKS cluster access (kubectl). Get yours with: aws sts get-caller-identity --query Arn --output text. Set in terraform.tfvars (não commitar)."
   type        = list(string)
-  default     = []
+  default     = ["arn:aws:iam::027653366477:user/kenzo"]
 }
