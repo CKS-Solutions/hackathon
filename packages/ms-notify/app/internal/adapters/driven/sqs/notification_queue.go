@@ -3,6 +3,7 @@ package sqs
 import (
 	"context"
 	"encoding/json"
+	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -25,6 +26,9 @@ func NewNotificationQueue(client aws_infra.SQSClient) ports.NotificationQueue {
 }
 
 func (i *NotificationQueueImpl) getQueueUrl() (*string, error) {
+	if url := os.Getenv("SQS_QUEUE_URL"); url != "" {
+		return &url, nil
+	}
 	queueUrl, err := i.client.GetQueueUrl(context.TODO(), &sqs.GetQueueUrlInput{
 		QueueName: aws.String(QUEUE_NAME),
 	})

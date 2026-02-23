@@ -19,3 +19,5 @@ spec:
               value: "prod"
             - name: AWS_REGION
               value: "us-east-1"
+            - name: SQS_QUEUE_URL
+              value: "https://sqs.us-east-1.amazonaws.com/027653366477/MSNotify-Queue"
