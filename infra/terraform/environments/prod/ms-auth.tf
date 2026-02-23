@@ -14,7 +14,7 @@ module "ms_auth_rds" {
   vpc_id      = module.vpc.vpc_id
   subnet_ids  = module.vpc.private_subnet_ids
 
-  allowed_security_groups = [module.eks.cluster_security_group_id]
+  allowed_security_groups = []
 
   db_name     = "authdb"
   db_username = "authuser"
