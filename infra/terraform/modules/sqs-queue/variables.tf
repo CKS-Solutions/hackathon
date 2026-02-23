@@ -31,8 +31,8 @@ variable "receive_wait_time_seconds" {
 }
 
 variable "max_receive_count" {
-  type    = number
-  default = 5
+  type        = number
+  default     = 5
   description = "Max receive count before message goes to DLQ (only used when create_dlq is true)."
 }
 

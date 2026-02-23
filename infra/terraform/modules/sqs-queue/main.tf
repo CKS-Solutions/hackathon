@@ -15,9 +15,9 @@ resource "aws_sqs_queue" "dlq" {
 resource "aws_sqs_queue" "main" {
   name = var.queue_name
 
-  visibility_timeout_seconds  = var.visibility_timeout_seconds
-  message_retention_seconds   = var.message_retention_seconds
-  receive_wait_time_seconds   = var.receive_wait_time_seconds
+  visibility_timeout_seconds = var.visibility_timeout_seconds
+  message_retention_seconds  = var.message_retention_seconds
+  receive_wait_time_seconds  = var.receive_wait_time_seconds
 
   redrive_policy = var.create_dlq ? jsonencode({
     deadLetterTargetArn = aws_sqs_queue.dlq[0].arn
