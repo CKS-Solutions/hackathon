@@ -6,7 +6,7 @@ metadata:
 spec:
   template:
     spec:
-      serviceAccountName: ms-notify
+      serviceAccountName: app
       containers:
         - name: ms-notify
           image: 027653366477.dkr.ecr.us-east-1.amazonaws.com/ms-notify:latest

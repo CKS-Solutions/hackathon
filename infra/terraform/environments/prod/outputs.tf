@@ -49,7 +49,7 @@ output "ms_notify_ses_sender_email" {
   value       = module.ms_notify_ses.email
 }
 
-output "ms_notify_irsa_role_arn" {
-  description = "ARN of the IAM role for ms-notify (IRSA). Set as ServiceAccount annotation eks.amazonaws.com/role-arn in video-system namespace."
-  value       = aws_iam_role.ms_notify.arn
+output "app_irsa_role_arn" {
+  description = "ARN of the IAM role for video-system apps (IRSA). ServiceAccount video-system/app; used by ms-auth, ms-video, ms-notify."
+  value       = aws_iam_role.app.arn
 }

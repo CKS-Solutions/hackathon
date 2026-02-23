@@ -5,6 +5,7 @@ metadata:
 spec:
   template:
     spec:
+      serviceAccountName: app
       containers:
         - name: ms-auth
           image: 027653366477.dkr.ecr.us-east-1.amazonaws.com/ms-auth:latest

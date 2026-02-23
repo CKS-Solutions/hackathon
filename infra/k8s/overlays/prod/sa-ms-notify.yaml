@@ -1,8 +1,0 @@
-# ServiceAccount for ms-notify with IRSA. ARN = terraform output ms_notify_irsa_role_arn (e.g. hackathon-prod-ms-notify).
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: ms-notify
-  namespace: video-system
-  annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::027653366477:role/hackathon-prod-ms-notify

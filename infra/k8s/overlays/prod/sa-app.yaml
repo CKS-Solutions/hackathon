@@ -1,0 +1,8 @@
+# ServiceAccount genérica com IRSA para ms-auth, ms-video e ms-notify. ARN = terraform output app_irsa_role_arn
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: app
+  namespace: video-system
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::027653366477:role/hackathon-prod-app
