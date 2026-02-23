@@ -29,9 +29,9 @@ module "eks" {
   vpc_id              = module.vpc.vpc_id
   private_subnet_ids  = module.vpc.private_subnet_ids
   node_instance_types = ["t3.small"]
-  node_desired_size   = 2
+  node_desired_size   = 3   # 2 nós + kube-prometheus-stack = "Too many pods"; 3 nós evita
   node_min_size       = 1
-  node_max_size       = 3
+  node_max_size       = 5
   environment         = var.environment
 }
 
