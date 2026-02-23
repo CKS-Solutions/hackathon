@@ -1,0 +1,49 @@
+# Application para o stack de observabilidade (Prometheus + Grafana).
+# Aplicar uma vez (após instalar o Argo CD): kubectl apply -f infra/k8s/argocd/application-monitoring.yaml
+# O release é instalado no namespace monitoring; Grafana acessível por port-forward (ver README Entrega 8).
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring-stack
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: "58.0.0"
+    helm:
+      values: |
+        # Prometheus: descobrir ServiceMonitors em todos os namespaces e sem exigir label release
+        prometheus:
+          prometheusSpec:
+            ignoreNamespaceSelectors: true
+            serviceMonitorSelectorNilUsesHelmValues: false
+            serviceMonitorSelector: {}
+            retention: 7d
+            resources:
+              requests:
+                memory: 400Mi
+                cpu: 100m
+              limits:
+                memory: 1Gi
+        # Grafana: senha admin simples para hackathon; acesso por port-forward (sem Ingress)
+        grafana:
+          adminPassword: "admin"
+          ingress:
+            enabled: false
+          resources:
+            requests:
+              memory: 128Mi
+              cpu: 50m
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

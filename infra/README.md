@@ -147,6 +147,80 @@ Cada entrega é **pequena**, **testável** e prepara a próxima. Você pode vali
 
 **Pré-requisito obrigatório antes de rodar o projeto (Terraform ou pipelines):** As pipelines de Terraform (plan/apply/destroy) usam um **IAM user** com access key, e não OIDC, para permitir rodar destroy e apply em sequência pelo CI sem passo local. Você deve **criar um IAM user** na AWS (ex.: `github-terraform-ci`) com permissão para aplicar/destruir a infra (recomendado: policy **AdministratorAccess** no escopo do hackathon), gerar uma **access key** e configurar no repositório (Settings → Secrets and variables → Actions) os **Secrets** `AWS_ACCESS_KEY_ID` e `AWS_SECRET_ACCESS_KEY`. Sem isso, os workflows de Terraform no CI falham ao obter credenciais. O build-push (ECR) continua usando OIDC (secret `AWS_ROLE_ARN`), criado após o primeiro apply do Terraform.
 
+#### Resumo do que temos até agora (Entregas 1–8)
+
+| Entrega | O que está pronto |
+|--------|--------------------|
+| **1** | Docker + Compose local (ms-stub, RabbitMQ, Postgres). |
+| **2** | Kustomize (base + overlay dev) para cluster local (kind/minikube). |
+| **3** | Terraform: VPC, EKS (prod), backend S3 para state. |
+| **4** | ECR (repos ms-auth, ms-video, ms-notify), OIDC para GitHub Actions, pipeline **build-push** (build, Trivy, push com tags `sha` e `latest`). |
+| **4b** | Pipelines **terraform-apply** e **terraform-destroy** (prod), usando IAM user (access key) para Terraform. |
+| **5** | Overlay prod com imagens ECR; deploy no EKS (por Argo CD ou um `kubectl apply -k` inicial). |
+| **6** | Ingress + ALB: subnet tags no VPC, IRSA do AWS Load Balancer Controller, Helm do controller (com `vpcId`), Ingress path-based (`/auth`, `/video`, `/notify`). |
+| **7** | Argo CD instalado no EKS; Application apontando para `infra/k8s/overlays/prod` (branch master, repo público); sync automático — não é mais necessário rodar `kubectl apply -k` para prod. |
+| **8** | Observabilidade: Application Argo CD (Helm) para kube-prometheus-stack no namespace `monitoring`; ms-stub expõe `/metrics`; ServiceMonitor no overlay prod para scrape dos três microsserviços; Grafana acessível por port-forward. |
+
+**Componentes atuais:** VPC, EKS, ECR, IAM (OIDC para ECR + IAM user para Terraform), AWS Load Balancer Controller (Helm), Argo CD (Helm), Applications `video-system-prod` e `monitoring-stack`. A aplicação (ms-auth, ms-video, ms-notify como stubs com `/metrics`) é deployada pelo Argo CD; o stack de observabilidade (Prometheus + Grafana) é instalado via Argo CD a partir do chart Helm.
+
+#### Passo a passo: levantar tudo após `terraform destroy`
+
+Depois de rodar **terraform destroy** (pela pipeline ou local), para ter o projeto rodando de novo:
+
+1. **Pré-requisito**  
+   Garantir que existem no GitHub (Settings → Secrets and variables → Actions):
+   - **Secrets:** `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (IAM user para Terraform).
+   - **Secret:** `AWS_ROLE_ARN` (será preenchido após o primeiro apply — output `github_actions_role_arn`).
+   - **Variáveis:** `AWS_REGION`, `ECR_MS_AUTH_URL`, `ECR_MS_VIDEO_URL`, `ECR_MS_NOTIFY_URL`, `terraform_state_bucket`, etc., conforme a seção da Entrega 4 e as variáveis do Terraform prod.
+
+2. **Terraform apply**  
+   Rodar a pipeline **Terraform Apply** (Environment prod) ou, local, `cd infra/terraform/environments/prod && terraform apply`. Isso recria VPC, EKS, ECR, IRSA (ECR), subnet tags, IRSA do Load Balancer Controller, etc. O state fica no S3 (bucket configurado no backend).
+
+3. **Kubeconfig**  
+   Na sua máquina: `aws eks update-kubeconfig --region <region> --name hackathon-prod`. Se `kubectl get nodes` pedir credenciais, incluir seu IAM no `cluster_access_principal_arns` no Terraform e rodar apply de novo.
+
+4. **AWS Load Balancer Controller (Helm)**  
+   Instalar/atualizar o controller com o **vpcId** (evita crash por metadata):
+   ```bash
+   helm repo add eks https://aws.github.io/eks-charts && helm repo update
+   helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
+     -n kube-system \
+     --set clusterName=hackathon-prod \
+     --set serviceAccount.create=true \
+     --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=<LB_CONTROLLER_ROLE_ARN> \
+     --set region=<AWS_REGION> \
+     --set vpcId=<VPC_ID>
+   ```
+   Use os outputs do Terraform: `lb_controller_role_arn`, `vpc_id` (ex.: `terraform output -raw lb_controller_role_arn`).
+
+5. **Argo CD (Helm)**  
+   Se o cluster foi recriado, instalar o Argo CD de novo:
+   ```bash
+   helm repo add argo https://argoproj.github.io/argo-helm && helm repo update
+   kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+   helm upgrade --install argocd argo/argo-cd -n argocd
+   ```
+   Aguardar os pods em `argocd`: `kubectl get pods -n argocd`.
+
+6. **Applications do Argo CD**  
+   Aplicar as Applications uma vez (repo e branch já no YAML; se usou placeholder, ajustar antes):
+   ```bash
+   kubectl apply -f infra/k8s/argocd/application-prod.yaml
+   kubectl apply -f infra/k8s/argocd/application-monitoring.yaml
+   ```
+   O Argo CD fará o sync automático: a primeira aplica o overlay prod (Deployments, Services, Ingress, ServiceMonitor) no namespace `video-system`; a segunda instala o kube-prometheus-stack (Prometheus, Grafana) no namespace `monitoring`.
+
+7. **Conferir**  
+   - Pods: `kubectl get pods -n video-system` e `kubectl get pods -n monitoring`
+   - Ingress (ALB): `kubectl get ingress -n video-system` — o ADDRESS pode levar alguns minutos.
+   - Testar: `curl -s http://<alb-hostname>/auth` (e `/video`, `/notify`).
+   - Grafana (opcional): `kubectl port-forward svc/monitoring-stack-grafana -n monitoring 3000:80` e acessar `http://localhost:3000` (login admin; senha no Secret ou nos values da Application).
+
+8. **Build-push (opcional)**  
+   Se quiser imagens novas no ECR, rodar a pipeline **Build and Push to ECR** (ou push na branch master). O `AWS_ROLE_ARN` no GitHub deve ser o `github_actions_role_arn` do Terraform (configurado após o apply do passo 2).
+
+**Resumo:** Terraform apply → kubeconfig → Helm (LB controller com vpcId) → Helm (Argo CD) → `kubectl apply -f` das Applications (prod + monitoring) → Argo CD sincroniza a app e o stack de observabilidade. Não é necessário rodar `kubectl apply -k` para o overlay prod; o Argo CD cuida disso.
+
 ---
 
 ### Entrega 1 — Fundação local (Docker + Compose)
@@ -533,11 +607,51 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
 
 **Objetivo:** Métricas e dashboards para o cluster e para os microsserviços.
 
-- Instalar **Prometheus** (e talvez **kube-prometheus-stack** ou Prometheus Operator) no cluster.
-- Instalar **Grafana** e configurar datasource Prometheus; criar um dashboard básico (CPU/memória dos pods, requests por serviço se as apps expuserem métricas).
-- Expor métricas nos serviços Go (ex.: `/metrics` em formato Prometheus).
+- Instalar **Prometheus** (kube-prometheus-stack / Prometheus Operator) no cluster via Argo CD (Helm).
+- Instalar **Grafana** com datasource Prometheus; dashboards pré-instalados pelo chart (CPU/memória dos pods, cluster).
+- Expor **métricas** nos serviços Go (ex.: `/metrics` em formato Prometheus); o ms-stub já expõe `/metrics`; ServiceMonitor no overlay prod permite ao Prometheus scrape os três microsserviços.
 
 **Critério de sucesso:** Grafana acessível; dashboard mostrando métricas do cluster e dos serviços.
+
+#### Como rodar a Entrega 8
+
+**Pré-requisitos:** Entrega 7 concluída (Argo CD instalado; Application `video-system-prod` aplicada); overlay prod já contém o ServiceMonitor e os serviços expõem `/metrics`; `kubectl` com kubeconfig apontando para o cluster prod.
+
+1. **Aplicar a Application de monitoring**  
+   Uma vez (após o Argo CD estar rodando):
+   ```bash
+   kubectl apply -f infra/k8s/argocd/application-monitoring.yaml
+   ```
+   O Argo CD fará o sync e instalará o kube-prometheus-stack (Prometheus, Grafana, node-exporter, kube-state-metrics, etc.) no namespace `monitoring`.
+
+2. **Aguardar sync e verificar pods**  
+   Aguarde os pods do stack ficarem Running:
+   ```bash
+   kubectl get pods -n monitoring
+   ```
+   O nome do release no namespace pode ser `monitoring-stack` (prefixo do chart). Verifique também que a aplicação `video-system-prod` está em sync para que o ServiceMonitor no overlay prod seja aplicado.
+
+3. **Acesso ao Grafana (port-forward)**  
+   Por padrão o Grafana não é exposto por Ingress. Use port-forward (na raiz do repositório ou com o caminho correto para o YAML):
+   ```bash
+   kubectl port-forward svc/monitoring-stack-grafana -n monitoring 3000:80
+   ```
+   Se o nome do Service for outro (ex.: `kube-prometheus-stack-grafana`), liste com `kubectl get svc -n monitoring` e use o nome correto. Acesse `http://localhost:3000`. Login: usuário `admin`; senha definida nos values da Application (ex.: `admin` no exemplo; em produção use um Secret ou value mais seguro).
+
+4. **Senha admin do Grafana**  
+   Se não tiver a senha, leia o Secret gerado pelo chart:
+   ```bash
+   kubectl get secret -n monitoring monitoring-stack-grafana -o jsonpath="{.data.admin-password}" | base64 -d; echo
+   ```
+   (Ajuste o nome do Secret se o release tiver outro nome.)
+
+5. **Dashboards**  
+   O chart já instala vários dashboards (Kubernetes / Compute resources / Pods, Workload, etc.). No Grafana: Menu → Dashboards → Browse. Para métricas dos microsserviços (ms-auth, ms-video, ms-notify), verifique em Prometheus → Status → Targets que os targets do job `video-system-services` estão UP; depois use Explore com queries como `up{namespace="video-system"}` ou `process_resident_memory_bytes{namespace="video-system"}`. Opcional: importar o dashboard customizado [infra/k8s/monitoring/grafana-dashboard-video-system.json](infra/k8s/monitoring/grafana-dashboard-video-system.json) (Grafana → Dashboards → New → Import → upload do JSON ou colar o conteúdo) para um painel com status *up* e memória RSS dos serviços do video-system.
+
+6. **Validar o critério de sucesso**  
+   Grafana acessível em `http://localhost:3000` (via port-forward); ao menos um dashboard de cluster aberto; targets do video-system em Prometheus com estado UP.
+
+**Rollback:** Remover a Application: `kubectl delete application monitoring-stack -n argocd` (o Argo CD pode remover os recursos do namespace `monitoring` se prune estiver ativo). Ou desabilitar sync e desinstalar o release manualmente: `helm uninstall monitoring-stack -n monitoring`.
 
 ---
 

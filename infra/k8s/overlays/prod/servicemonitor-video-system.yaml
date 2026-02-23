@@ -1,0 +1,21 @@
+# ServiceMonitor para o Prometheus scrape dos microsserviços (ms-auth, ms-video, ms-notify) no path /metrics.
+# Requer que o Prometheus (kube-prometheus-stack) tenha ignoreNamespaceSelectors: true ou
+# serviceMonitorNamespaceSelector que inclua o namespace video-system.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: video-system-services
+  namespace: video-system
+spec:
+  selector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - ms-auth
+          - ms-video
+          - ms-notify
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s

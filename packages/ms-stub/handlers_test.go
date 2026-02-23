@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -100,5 +101,22 @@ func TestHandleReady(t *testing.T) {
 				t.Errorf("status = %d, want %d", rec.Code, tt.wantStatus)
 			}
 		})
+	}
+}
+
+func TestMetricsEndpoint(t *testing.T) {
+	srv := NewServer(":0", "ms-auth")
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Errorf("GET /metrics status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+	if body == "" {
+		t.Error("GET /metrics body is empty")
+	}
+	if !strings.Contains(body, "# TYPE") {
+		t.Errorf("GET /metrics body should contain Prometheus output (# TYPE); got %d bytes", len(body))
 	}
 }
