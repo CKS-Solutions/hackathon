@@ -49,13 +49,20 @@ func NewRouter(ctx context.Context, region awsinfra.Region, stage awsinfra.Stage
 
 	notificationController := controller.NewNotificationController(notificationProducerUsecase)
 
+	healthResp := []byte(`{"status":"healthy","service":"ms-notify"}`)
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"healthy","service":"ms-notify"}`))
+		w.Write(healthResp)
+	})
+	mux.HandleFunc("/notify/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(healthResp)
 	})
 
 	mux.Handle("/notification", notificationController.Create)
+	mux.Handle("/notify/notification", notificationController.Create)
 
 	return mux
 }
