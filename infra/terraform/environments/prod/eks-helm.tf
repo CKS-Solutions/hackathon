@@ -98,7 +98,7 @@ resource "kubernetes_manifest" "argocd_app_prod" {
       }
       syncPolicy = {
         automated = {
-          prune   = true
+          prune    = true
           selfHeal = true
         }
       }
@@ -157,7 +157,7 @@ resource "kubernetes_manifest" "argocd_app_monitoring" {
       }
       syncPolicy = {
         automated = {
-          prune   = true
+          prune    = true
           selfHeal = true
         }
         syncOptions = ["CreateNamespace=true", "ServerSideApply=true"]
