@@ -195,52 +195,24 @@ Depois de rodar **terraform destroy** (pela pipeline ou local), para ter o proje
    - **Variáveis:** `AWS_REGION`, `ECR_REGISTRY` (prefixo do ECR, ex.: `123456789012.dkr.ecr.us-east-1.amazonaws.com` — use um item de `ecr_repository_urls` sem o sufixo `/ms-auth`), `terraform_state_bucket`, etc., conforme a seção da Entrega 4.
 
 2. **Terraform apply**  
-   Rodar a pipeline **Terraform Apply** (Environment prod) ou, local, `cd infra/terraform/environments/prod && terraform apply`. Isso recria VPC, EKS, ECR, IRSA (ECR), subnet tags, IRSA do Load Balancer Controller, etc. O state fica no S3 (bucket configurado no backend).
+   Rodar a pipeline **Terraform Apply** (Environment prod) ou, local, `cd infra/terraform/environments/prod && terraform apply`. Isso recria VPC, EKS, ECR, IRSA (ECR), subnet tags, IRSA do Load Balancer Controller e, no mesmo apply, instala via **Helm provider** o AWS Load Balancer Controller, o Argo CD e as duas Applications (video-system-prod e monitoring-stack). O state fica no S3 (bucket configurado no backend). Quem roda o apply precisa ter **AWS CLI** configurado (os providers Kubernetes e Helm usam `aws eks get-token` para autenticar no cluster).
 
 3. **Kubeconfig**  
-   Na sua máquina: `aws eks update-kubeconfig --region <region> --name hackathon-prod`. Se `kubectl get nodes` pedir credenciais, incluir seu IAM no `cluster_access_principal_arns` no Terraform e rodar apply de novo.
+   Na sua máquina: `aws eks update-kubeconfig --region <region> --name hackathon-prod`. Se `kubectl get nodes` pedir credenciais, incluir seu IAM no `cluster_access_principal_arns` no Terraform e rodar apply de novo. Este é o único passo manual após o apply; o restante (LB controller, Argo CD, Applications) é feito pelo Terraform.
 
-4. **AWS Load Balancer Controller (Helm)**  
-   Instalar/atualizar o controller com o **vpcId** (evita crash por metadata):
-   ```bash
-   helm repo add eks https://aws.github.io/eks-charts && helm repo update
-   helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
-     -n kube-system \
-     --set clusterName=hackathon-prod \
-     --set serviceAccount.create=true \
-     --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=<LB_CONTROLLER_ROLE_ARN> \
-     --set region=<AWS_REGION> \
-     --set vpcId=<VPC_ID>
-   ```
-   Use os outputs do Terraform: `lb_controller_role_arn`, `vpc_id` (ex.: `terraform output -raw lb_controller_role_arn`).
-
-5. **Argo CD (Helm)**  
-   Se o cluster foi recriado, instalar o Argo CD de novo:
-   ```bash
-   helm repo add argo https://argoproj.github.io/argo-helm && helm repo update
-   kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-   helm upgrade --install argocd argo/argo-cd -n argocd
-   ```
-   Aguardar os pods em `argocd`: `kubectl get pods -n argocd`.
-
-6. **Applications do Argo CD**  
-   Aplicar as Applications uma vez (repo e branch já no YAML; se usou placeholder, ajustar antes):
-   ```bash
-   kubectl apply -f infra/k8s/argocd/application-prod.yaml
-   kubectl apply -f infra/k8s/argocd/application-monitoring.yaml
-   ```
-   O Argo CD fará o sync automático: a primeira aplica o overlay prod (Deployments, Services, Ingress, ServiceMonitor) no namespace `video-system`; a segunda instala o kube-prometheus-stack (Prometheus, Grafana) no namespace `monitoring`.
-
-7. **Conferir**  
+4. **Conferir**  
    - Pods: `kubectl get pods -n video-system` e `kubectl get pods -n monitoring`
    - Ingress (ALB): `kubectl get ingress -n video-system` — o ADDRESS pode levar alguns minutos.
    - Testar: `curl -s http://<alb-hostname>/auth` (e `/video`, `/notify`).
    - Grafana (opcional): `kubectl port-forward svc/monitoring-stack-grafana -n monitoring 3000:80` e acessar `http://localhost:3000` (login admin; senha no Secret ou nos values da Application).
 
-8. **Build-push (opcional)**  
+5. **Build-push (opcional)**  
    Se quiser imagens novas no ECR, rodar a pipeline **Build and Push to ECR** (ou push na branch master). O `AWS_ROLE_ARN` no GitHub deve ser o `github_actions_role_arn` do Terraform (configurado após o apply do passo 2).
 
-**Resumo:** Terraform apply → kubeconfig → Helm (LB controller com vpcId) → Helm (Argo CD) → `kubectl apply -f` das Applications (prod + monitoring) → Argo CD sincroniza a app e o stack de observabilidade. Não é necessário rodar `kubectl apply -k` para o overlay prod; o Argo CD cuida disso.
+**Resumo:** Terraform apply (cria EKS e instala LB controller, Argo CD e Applications via Helm/Kubernetes providers) → kubeconfig na sua máquina → Argo CD sincroniza a app e o stack de observabilidade. Não é necessário rodar comandos Helm nem `kubectl apply -f` das Applications manualmente; o Terraform cuida disso.
+
+**Instalação manual (alternativa)**  
+Se precisar instalar o LB controller, Argo CD ou as Applications fora do Terraform (ex.: troubleshooting), use os comandos da seção da Entrega 6 (Helm LB controller) e Entrega 7 (Argo CD e Applications) neste README.
 
 ---
 

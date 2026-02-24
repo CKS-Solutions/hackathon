@@ -35,6 +35,11 @@ module "eks" {
   environment         = var.environment
 }
 
+# Data source para configurar os providers Kubernetes e Helm após o cluster existir.
+data "aws_eks_cluster" "cluster" {
+  name = module.eks.cluster_id
+}
+
 # EKS Access Entries: quem pode usar kubectl (sem isso dá "server asked for credentials")
 resource "aws_eks_access_entry" "cluster_access" {
   for_each = toset(var.cluster_access_principal_arns)
