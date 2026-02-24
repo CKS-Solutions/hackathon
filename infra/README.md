@@ -163,6 +163,27 @@ Cada entrega é **pequena**, **testável** e prepara a próxima. Você pode vali
 
 **Componentes atuais:** VPC, EKS, ECR, IAM (OIDC para ECR + IAM user para Terraform), AWS Load Balancer Controller (Helm), Argo CD (Helm), Applications `video-system-prod` e `monitoring-stack`. A aplicação (ms-auth, ms-video, ms-notify com imagem real no ECR) é deployada pelo Argo CD; o stack de observabilidade (Prometheus + Grafana) é instalado via Argo CD a partir do chart Helm. Os três serviços usam uma **ServiceAccount genérica** `video-system/app` com IRSA (role `hackathon-prod-app`); output Terraform `app_irsa_role_arn`. Recursos AWS do **ms-notify** (SQS, DynamoDB, SES) estão em `infra/terraform`: módulos genéricos em `modules/sqs-queue`, `dynamodb-table`, `ses-email-identity` e instância em `environments/prod/ms-notify.tf`; use os outputs `ms_notify_sqs_queue_url`, `ms_notify_dynamodb_table_name` e `ms_notify_ses_sender_email` para configurar o Deployment do ms-notify (env ou External Secrets).
 
+#### Antes do `terraform destroy`: evitar DependencyViolation (subnet / IGW)
+
+O EKS e o **Ingress** criam recursos de rede que **não estão no Terraform**: o ALB (Application Load Balancer) é criado pelo AWS Load Balancer Controller quando existe um Ingress no cluster. Esse ALB mantém ENIs nas subnets; o **NAT Gateway** (no módulo VPC) mantém um Elastic IP. Se você rodar `terraform destroy` direto, pode aparecer:
+
+- `DependencyViolation: The subnet has dependencies and cannot be deleted`
+- `DependencyViolation: Network has some mapped public address(es). Please unmap before detaching the gateway`
+
+**Ordem recomendada antes de rodar destroy:**
+
+1. **Com o cluster ainda de pé:** apagar o Ingress para o controller destruir o ALB:
+   ```bash
+   kubectl delete ingress video-system -n video-system
+   ```
+   Aguardar 2–3 minutos para o ALB sumir no console AWS (EC2 → Load Balancers).
+
+2. **Rodar o destroy:** pela pipeline ou `cd infra/terraform/environments/prod && terraform destroy`. A destruição do EKS (node group + cluster) pode levar vários minutos.
+
+3. **Se ainda falhar (subnet / IGW):** o cluster já pode ter sido removido do state, mas a AWS ainda está encerrando recursos (ENIs, etc.). Opções:
+   - **Esperar 5–10 minutos** e rodar `terraform destroy` de novo.
+   - **Console AWS:** EC2 → Load Balancers → apagar qualquer ALB com nome tipo `k8s-videosys-...`; EC2 → Network Interfaces → encerrar ENIs órfãs da VPC em questão (só se tiver certeza). Depois rodar `terraform destroy` de novo.
+
 #### Passo a passo: levantar tudo após `terraform destroy`
 
 Depois de rodar **terraform destroy** (pela pipeline ou local), para ter o projeto rodando de novo:
