@@ -1,33 +1,23 @@
-# Application para o stack de logs (Loki + Promtail).
-# Aplicar após o Argo CD e, se desejado, após monitoring-stack: kubectl apply -f infra/k8s/argocd/application-loki.yaml
-# O release é instalado no namespace monitoring; o Grafana (kube-prometheus-stack) deve ter datasource Loki configurado em application-monitoring.yaml.
+# Application para Loki (chart oficial: grafana/loki production/helm/loki).
+# Promtail fica em application-promtail.yaml. Datasource Grafana aponta para o gateway (loki-gateway).
+# Remover a Application antiga loki-stack antes de aplicar esta, se ainda existir.
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: loki-stack
+  name: loki
   namespace: argocd
 spec:
   project: default
   source:
-    repoURL: https://grafana.github.io/helm-charts
-    chart: loki-stack
-    targetRevision: "2.10.3"
+    repoURL: https://github.com/grafana/loki.git
+    path: production/helm/loki
+    targetRevision: main
     helm:
       values: |
-        # Não instalar Grafana (já temos no kube-prometheus-stack)
-        grafana:
-          enabled: false
-        prometheus:
-          enabled: false
-        fluent-bit:
-          enabled: false
-        # Loki: single binary; persistence desabilitada para agendar sem PVC (cluster pode não ter StorageClass).
-        # Para persistir logs, ative persistence e garanta um StorageClass no EKS (ex.: EBS CSI driver).
-        loki:
-          enabled: true
-          persistence:
-            enabled: false
+        deploymentMode: SingleBinary
+        singleBinary:
+          replicas: 1
           resources:
             requests:
               memory: 256Mi
@@ -35,9 +25,51 @@ spec:
             limits:
               memory: 512Mi
               cpu: 500m
-        # Promtail: coleta logs dos pods e envia para Loki
-        promtail:
+        loki:
+          commonConfig:
+            replication_factor: 1
+          schemaConfig:
+            configs:
+              - from: "2024-04-01"
+                store: tsdb
+                object_store: s3
+                schema: v13
+                index:
+                  prefix: loki_index_
+                  period: 24h
+          pattern_ingester:
+            enabled: true
+          limits_config:
+            allow_structured_metadata: true
+            volume_enabled: true
+          ruler:
+            enable_api: true
+        minio:
           enabled: true
+        backend:
+          replicas: 0
+        read:
+          replicas: 0
+        write:
+          replicas: 0
+        ingester:
+          replicas: 0
+        querier:
+          replicas: 0
+        queryFrontend:
+          replicas: 0
+        queryScheduler:
+          replicas: 0
+        distributor:
+          replicas: 0
+        compactor:
+          replicas: 0
+        indexGateway:
+          replicas: 0
+        bloomCompactor:
+          replicas: 0
+        bloomGateway:
+          replicas: 0
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring

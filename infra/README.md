@@ -159,9 +159,9 @@ Cada entrega é **pequena**, **testável** e prepara a próxima. Você pode vali
 | **5** | Overlay prod com imagens ECR; deploy no EKS (por Argo CD ou um `kubectl apply -k` inicial). |
 | **6** | Ingress + ALB: subnet tags no VPC, IRSA do AWS Load Balancer Controller, Helm do controller (com `vpcId`), Ingress path-based (`/auth`, `/video`, `/notify`). |
 | **7** | Argo CD instalado no EKS; Application apontando para `infra/k8s/overlays/prod` (branch master, repo público); sync automático — não é mais necessário rodar `kubectl apply -k` para prod. |
-| **8** | Observabilidade: Applications Argo CD (Helm) para kube-prometheus-stack e loki-stack (Loki + Promtail) no namespace `monitoring`; ms-stub expõe `/metrics`; ServiceMonitor no overlay prod; Grafana com datasources Prometheus e Loki; logs agregados no Loki. |
+| **8** | Observabilidade: Applications Argo CD (Helm) para kube-prometheus-stack, Loki (chart oficial grafana/loki) e Promtail no namespace `monitoring`; Grafana com datasources Prometheus e Loki (via gateway); logs agregados no Loki. |
 
-**Componentes atuais:** VPC, EKS, ECR, IAM (OIDC para ECR + IAM user para Terraform), AWS Load Balancer Controller (Helm), Argo CD (Helm), Applications `video-system-prod`, `monitoring-stack` e `loki-stack`. A aplicação (ms-auth, ms-video, ms-notify com imagem real no ECR) é deployada pelo Argo CD; o stack de observabilidade (Prometheus + Grafana) é instalado via Argo CD a partir do chart Helm. Os três serviços usam uma **ServiceAccount genérica** `video-system/app` com IRSA (role `hackathon-prod-app`); output Terraform `app_irsa_role_arn`. Recursos AWS do **ms-notify** (SQS, DynamoDB, SES) estão em `infra/terraform`: módulos genéricos em `modules/sqs-queue`, `dynamodb-table`, `ses-email-identity` e instância em `environments/prod/ms-notify.tf`; use os outputs `ms_notify_sqs_queue_url`, `ms_notify_dynamodb_table_name` e `ms_notify_ses_sender_email` para configurar o Deployment do ms-notify (env ou External Secrets).
+**Componentes atuais:** VPC, EKS, ECR, IAM (OIDC para ECR + IAM user para Terraform), AWS Load Balancer Controller (Helm), Argo CD (Helm), Applications `video-system-prod`, `monitoring-stack`, `loki` (chart oficial [grafana/loki](https://github.com/grafana/loki/tree/main/production/helm/loki)) e `promtail`. A aplicação (ms-auth, ms-video, ms-notify com imagem real no ECR) é deployada pelo Argo CD; o stack de observabilidade (Prometheus + Grafana) é instalado via Argo CD a partir do chart Helm. Os três serviços usam uma **ServiceAccount genérica** `video-system/app` com IRSA (role `hackathon-prod-app`); output Terraform `app_irsa_role_arn`. Recursos AWS do **ms-notify** (SQS, DynamoDB, SES) estão em `infra/terraform`: módulos genéricos em `modules/sqs-queue`, `dynamodb-table`, `ses-email-identity` e instância em `environments/prod/ms-notify.tf`; use os outputs `ms_notify_sqs_queue_url`, `ms_notify_dynamodb_table_name` e `ms_notify_ses_sender_email` para configurar o Deployment do ms-notify (env ou External Secrets).
 
 #### Passo a passo: levantar tudo após `terraform destroy`
 
@@ -208,8 +208,9 @@ Depois de rodar **terraform destroy** (pela pipeline ou local), para ter o proje
    kubectl apply -f infra/k8s/argocd/application-prod.yaml
    kubectl apply -f infra/k8s/argocd/application-monitoring.yaml
    kubectl apply -f infra/k8s/argocd/application-loki.yaml
+   kubectl apply -f infra/k8s/argocd/application-promtail.yaml
    ```
-   O Argo CD fará o sync automático: a primeira aplica o overlay prod (Deployments, Services, Ingress, ServiceMonitor) no namespace `video-system`; a segunda instala o kube-prometheus-stack (Prometheus, Grafana) no namespace `monitoring`; a terceira instala o loki-stack (Loki + Promtail) para agregação de logs no mesmo namespace.
+   O Argo CD fará o sync automático: a primeira aplica o overlay prod no namespace `video-system`; a segunda instala o kube-prometheus-stack (Prometheus, Grafana) no namespace `monitoring`; a terceira instala o Loki (chart oficial, modo Single Binary + MinIO); a quarta instala o Promtail para envio de logs ao Loki.
 
 7. **Conferir**  
    - Pods: `kubectl get pods -n video-system` e `kubectl get pods -n monitoring`
@@ -220,7 +221,7 @@ Depois de rodar **terraform destroy** (pela pipeline ou local), para ter o proje
 8. **Build-push (opcional)**  
    Se quiser imagens novas no ECR, rodar a pipeline **Build and Push to ECR** (ou push na branch master). O `AWS_ROLE_ARN` no GitHub deve ser o `github_actions_role_arn` do Terraform (configurado após o apply do passo 2).
 
-**Resumo:** Terraform apply → kubeconfig → Helm (LB controller com vpcId) → Helm (Argo CD) → `kubectl apply -f` das Applications (prod, monitoring, loki-stack) → Argo CD sincroniza a app e o stack de observabilidade (métricas + logs). Não é necessário rodar `kubectl apply -k` para o overlay prod; o Argo CD cuida disso.
+**Resumo:** Terraform apply → kubeconfig → Helm (LB controller com vpcId) → Helm (Argo CD) → `kubectl apply -f` das Applications (prod, monitoring, loki, promtail) → Argo CD sincroniza a app e o stack de observabilidade (métricas + logs). Loki usa o [chart oficial](https://github.com/grafana/loki/tree/main/production/helm/loki) (Single Binary + MinIO). Não é necessário rodar `kubectl apply -k` para o overlay prod; o Argo CD cuida disso.
 
 ---
 
@@ -611,7 +612,7 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
 - Instalar **Prometheus** (kube-prometheus-stack / Prometheus Operator) no cluster via Argo CD (Helm).
 - Instalar **Grafana** com datasources Prometheus e Loki; dashboards pré-instalados pelo chart (CPU/memória dos pods, cluster).
 - Expor **métricas** nos serviços Go (ex.: `/metrics` em formato Prometheus); o ms-stub já expõe `/metrics`; ServiceMonitor no overlay prod permite ao Prometheus scrape os três microsserviços.
-- Instalar **Loki + Promtail** (loki-stack) via Argo CD; Promtail coleta logs dos pods e envia para Loki; o Grafana já vem com o datasource Loki configurado em `application-monitoring.yaml`.
+- Instalar **Loki** (chart oficial [grafana/loki](https://github.com/grafana/loki/tree/main/production/helm/loki), modo Single Binary + MinIO) e **Promtail** via Argo CD; Promtail coleta logs dos pods e envia para o gateway do Loki; o Grafana já vem com o datasource Loki (URL do gateway) em `application-monitoring.yaml`.
 
 **Critério de sucesso:** Grafana acessível; dashboard mostrando métricas do cluster e dos serviços; no Explore, datasource Loki com query `{namespace="video-system"}` retornando logs dos microsserviços.
 
@@ -624,15 +625,16 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
    ```bash
    kubectl apply -f infra/k8s/argocd/application-monitoring.yaml
    kubectl apply -f infra/k8s/argocd/application-loki.yaml
+   kubectl apply -f infra/k8s/argocd/application-promtail.yaml
    ```
-   O Argo CD fará o sync: a primeira instala o kube-prometheus-stack (Prometheus, Grafana com datasource Loki já configurado, etc.) no namespace `monitoring`; a segunda instala o loki-stack (Loki + Promtail) no mesmo namespace.
+   O Argo CD fará o sync: a primeira instala o kube-prometheus-stack (Prometheus, Grafana com datasource Loki já configurado) no namespace `monitoring`; a segunda instala o Loki (chart oficial, Single Binary + MinIO); a terceira instala o Promtail no mesmo namespace.
 
 2. **Aguardar sync e verificar pods**  
    Aguarde os pods do stack ficarem Running:
    ```bash
    kubectl get pods -n monitoring
    ```
-   O nome do release do Prometheus/Grafana no namespace pode ser `monitoring-stack`; os pods do Loki e Promtail terão prefixo `loki-stack-`. Verifique também que a aplicação `video-system-prod` está em sync para que o ServiceMonitor no overlay prod seja aplicado.
+   O nome do release do Prometheus/Grafana no namespace pode ser `monitoring-stack`; os pods do Loki (e gateway, MinIO) e do Promtail terão prefixos conforme o chart oficial (`loki`, `loki-gateway`, `minio`, `promtail`). Verifique também que a aplicação `video-system-prod` está em sync para que o ServiceMonitor no overlay prod seja aplicado.
 
 3. **Acesso ao Grafana (port-forward)**  
    Por padrão o Grafana não é exposto por Ingress. Use port-forward (na raiz do repositório ou com o caminho correto para o YAML):
@@ -654,7 +656,7 @@ Os manifests estão em **infra/k8s/** (base + overlay dev). Use um cluster local
 6. **Validar o critério de sucesso**  
    Grafana acessível em `http://localhost:3000` (via port-forward); ao menos um dashboard de cluster aberto; targets do video-system em Prometheus com estado UP; no Explore com datasource Loki, query `{namespace="video-system"}` retornando linhas de log.
 
-**Rollback:** Remover as Applications: `kubectl delete application monitoring-stack -n argocd` e `kubectl delete application loki-stack -n argocd` (o Argo CD pode remover os recursos do namespace `monitoring` se prune estiver ativo). Ou desabilitar sync e desinstalar os releases manualmente: `helm uninstall monitoring-stack -n monitoring` e `helm uninstall loki-stack -n monitoring`.
+**Rollback:** Remover as Applications: `kubectl delete application monitoring-stack -n argocd`, `kubectl delete application loki -n argocd` e `kubectl delete application promtail -n argocd` (o Argo CD pode remover os recursos do namespace `monitoring` se prune estiver ativo). Ou desabilitar sync e desinstalar os releases manualmente: `helm uninstall monitoring-stack -n monitoring`, `helm uninstall loki -n monitoring`, `helm uninstall promtail -n monitoring`. **Migração do loki-stack antigo:** se ainda existir a Application `loki-stack`, remova-a antes de aplicar as novas (`loki` e `promtail`): `kubectl delete application loki-stack -n argocd`.
 
 ---
 
