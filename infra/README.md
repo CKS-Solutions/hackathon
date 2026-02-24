@@ -180,9 +180,13 @@ O EKS e o **Ingress** criam recursos de rede que **não estão no Terraform**: o
 
 2. **Rodar o destroy:** pela pipeline ou `cd infra/terraform/environments/prod && terraform destroy`. A destruição do EKS (node group + cluster) pode levar vários minutos.
 
-3. **Se ainda falhar (subnet / IGW):** o cluster já pode ter sido removido do state, mas a AWS ainda está encerrando recursos (ENIs, etc.). Opções:
+3. **Se o destroy falhar com `Invalid credentials` / `Unauthorized` (em `kubernetes_manifest.argocd_app_*`):** o IAM usado no CI (o usuário das secrets `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`) não está autorizado no EKS. O Terraform precisa conectar ao cluster para apagar os manifests do Argo CD. **Solução:** inclua o ARN desse IAM em `cluster_access_principal_arns` no `terraform.tfvars` (obtenha com `aws sts get-caller-identity --query Arn --output text` usando as mesmas credenciais do CI), rode **um apply** para criar o EKS Access Entry e, em seguida, rode o destroy de novo. **Alternativa (cluster já inacessível):** remova os recursos do state e destrua o resto: `terraform state rm 'kubernetes_manifest.argocd_app_prod' 'kubernetes_manifest.argocd_app_monitoring'` e depois `terraform destroy`.
+
+4. **Se ainda falhar (subnet / IGW):** o cluster já pode ter sido removido do state, mas a AWS ainda está encerrando recursos (ENIs, etc.). Opções:
    - **Esperar 5–10 minutos** e rodar `terraform destroy` de novo.
    - **Console AWS:** EC2 → Load Balancers → apagar qualquer ALB com nome tipo `k8s-videosys-...`; EC2 → Network Interfaces → encerrar ENIs órfãs da VPC em questão (só se tiver certeza). Depois rodar `terraform destroy` de novo.
+
+(Os itens 3 e 4 acima tratam de erros diferentes: 3 = credenciais EKS no destroy; 4 = dependências de rede após o cluster sumir.)
 
 #### Passo a passo: levantar tudo após `terraform destroy`
 
