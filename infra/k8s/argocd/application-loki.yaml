@@ -22,12 +22,12 @@ spec:
           enabled: false
         fluent-bit:
           enabled: false
-        # Loki: single binary com PVC; recursos para cluster pequeno
+        # Loki: single binary; persistence desabilitada para agendar sem PVC (cluster pode não ter StorageClass).
+        # Para persistir logs, ative persistence e garanta um StorageClass no EKS (ex.: EBS CSI driver).
         loki:
           enabled: true
           persistence:
-            enabled: true
-            size: 10Gi
+            enabled: false
           resources:
             requests:
               memory: 256Mi
