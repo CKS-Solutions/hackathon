@@ -42,6 +42,12 @@ spec:
             requests:
               memory: 128Mi
               cpu: 50m
+          # Datasource Loki (stack instalada pela Application loki-stack no namespace monitoring)
+          additionalDataSources:
+            - name: Loki
+              type: loki
+              url: http://loki-stack-loki.monitoring.svc.cluster.local:3100
+              access: proxy
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring

@@ -46,7 +46,8 @@ kubectl get pods -n argocd
 echo "==> 6. Aplicando Applications do Argo CD..."
 kubectl apply -f "$REPO_ROOT/infra/k8s/argocd/application-prod.yaml"
 kubectl apply -f "$REPO_ROOT/infra/k8s/argocd/application-monitoring.yaml"
+kubectl apply -f "$REPO_ROOT/infra/k8s/argocd/application-loki.yaml"
 
-echo "==> Concluído. Argo CD fará o sync automático."
+echo "==> Concluído. Argo CD fará o sync automático (prod, monitoring, loki-stack)."
 echo "    Pods: kubectl get pods -n video-system && kubectl get pods -n monitoring"
 echo "    Ingress: kubectl get ingress -n video-system"
