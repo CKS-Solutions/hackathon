@@ -12,7 +12,7 @@ spec:
   source:
     repoURL: https://grafana.github.io/helm-charts
     chart: loki-stack
-    targetRevision: "2.9.0"
+    targetRevision: "2.10.3"
     helm:
       values: |
         # Não instalar Grafana (já temos no kube-prometheus-stack)
