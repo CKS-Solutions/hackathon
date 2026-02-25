@@ -2,8 +2,8 @@
 
 # JWT Secret shared by ms-auth and ms-video
 resource "random_password" "jwt_secret" {
-  length  = 64
-  special = true
+  length           = 64
+  special          = true
   override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
