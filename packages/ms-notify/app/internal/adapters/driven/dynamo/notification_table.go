@@ -8,16 +8,20 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/cks-solutions/hackathon/ms-notify/internal/core/entities"
 	"github.com/cks-solutions/hackathon/ms-notify/internal/core/ports"
-	awsinfra "github.com/cks-solutions/hackathon/ms-notify/internal/infra/aws"
 )
 
+// dynamoClientInterface allows testing without a real DynamoDB client. *infra/aws.DynamoClient satisfies it.
+type dynamoClientInterface interface {
+	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
+}
+
 type NotificationTableImpl struct {
-	client awsinfra.DynamoClient
+	client dynamoClientInterface
 }
 
 const NOTIFICATION_TABLE_NAME = "MSNotify.Notification"
 
-func NewNotificationTable(client awsinfra.DynamoClient) ports.NotificationTable {
+func NewNotificationTable(client dynamoClientInterface) ports.NotificationTable {
 	return &NotificationTableImpl{
 		client: client,
 	}

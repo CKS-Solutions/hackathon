@@ -10,16 +10,23 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/cks-solutions/hackathon/ms-notify/internal/core/entities"
 	"github.com/cks-solutions/hackathon/ms-notify/internal/core/ports"
-	aws_infra "github.com/cks-solutions/hackathon/ms-notify/internal/infra/aws"
 )
 
 const QUEUE_NAME = "MSNotify-Queue"
 
-type NotificationQueueImpl struct {
-	client aws_infra.SQSClient
+// sqsClientInterface allows testing without a real SQS client. *infra/aws.SQSClient satisfies it.
+type sqsClientInterface interface {
+	GetQueueUrl(ctx context.Context, params *sqs.GetQueueUrlInput, optFns ...func(*sqs.Options)) (*sqs.GetQueueUrlOutput, error)
+	SendMessage(ctx context.Context, params *sqs.SendMessageInput, optFns ...func(*sqs.Options)) (*sqs.SendMessageOutput, error)
+	ReceiveMessage(ctx context.Context, params *sqs.ReceiveMessageInput, optFns ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error)
+	DeleteMessage(ctx context.Context, params *sqs.DeleteMessageInput, optFns ...func(*sqs.Options)) (*sqs.DeleteMessageOutput, error)
 }
 
-func NewNotificationQueue(client aws_infra.SQSClient) ports.NotificationQueue {
+type NotificationQueueImpl struct {
+	client sqsClientInterface
+}
+
+func NewNotificationQueue(client sqsClientInterface) ports.NotificationQueue {
 	return &NotificationQueueImpl{
 		client: client,
 	}

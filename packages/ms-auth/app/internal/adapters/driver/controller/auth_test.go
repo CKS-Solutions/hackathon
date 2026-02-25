@@ -105,6 +105,27 @@ func TestAuthController_Register(t *testing.T) {
 		}
 	})
 
+	t.Run("generic error returns 500", func(t *testing.T) {
+		c := NewAuthController(
+			&mockRegister{err: usecases.ErrInvalidCredentials}, // any non-Register-specific error
+			&mockLogin{},
+			&mockValidateToken{},
+		)
+		body, _ := json.Marshal(dto.RegisterInput{Email: "a@b.com", Password: "p", Name: "N"})
+		req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewReader(body))
+		w := httptest.NewRecorder()
+		err := c.Register(ctx, w, req)
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		if he, ok := err.(*utils.HTTPError); !ok || he.StatusCode != http.StatusInternalServerError {
+			t.Errorf("expected InternalServerError, got %v", err)
+		}
+		if err != nil && err.Error() != "failed to register user" {
+			t.Errorf("error message = %q, want \"failed to register user\"", err.Error())
+		}
+	})
+
 	t.Run("success", func(t *testing.T) {
 		user := &dto.UserOutput{ID: "1", Email: "u@b.com", Name: "U"}
 		c := NewAuthController(
@@ -179,6 +200,27 @@ func TestAuthController_Login(t *testing.T) {
 		}
 	})
 
+	t.Run("generic error returns 500", func(t *testing.T) {
+		c := NewAuthController(
+			&mockRegister{},
+			&mockLogin{err: usecases.ErrEmailAlreadyExists}, // any non-Login-specific error
+			&mockValidateToken{},
+		)
+		body, _ := json.Marshal(dto.LoginInput{Email: "a@b.com", Password: "p"})
+		req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
+		w := httptest.NewRecorder()
+		err := c.Login(ctx, w, req)
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		if he, ok := err.(*utils.HTTPError); !ok || he.StatusCode != http.StatusInternalServerError {
+			t.Errorf("expected InternalServerError, got %v", err)
+		}
+		if err != nil && err.Error() != "failed to login" {
+			t.Errorf("error message = %q, want \"failed to login\"", err.Error())
+		}
+	})
+
 	t.Run("success", func(t *testing.T) {
 		resp := &dto.AuthResponse{Token: "jwt", User: dto.UserOutput{Email: "u@b.com"}}
 		c := NewAuthController(
@@ -232,6 +274,27 @@ func TestAuthController_ValidateToken(t *testing.T) {
 		}
 		if he, ok := err.(*utils.HTTPError); !ok || he.StatusCode != http.StatusBadRequest {
 			t.Errorf("expected BadRequest, got %v", err)
+		}
+	})
+
+	t.Run("usecase error returns 500", func(t *testing.T) {
+		c := NewAuthController(
+			&mockRegister{},
+			&mockLogin{},
+			&mockValidateToken{err: usecases.ErrInvalidCredentials},
+		)
+		body, _ := json.Marshal(dto.ValidateTokenInput{Token: "jwt"})
+		req := httptest.NewRequest(http.MethodPost, "/validate", bytes.NewReader(body))
+		w := httptest.NewRecorder()
+		err := c.ValidateToken(ctx, w, req)
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		if he, ok := err.(*utils.HTTPError); !ok || he.StatusCode != http.StatusInternalServerError {
+			t.Errorf("expected InternalServerError, got %v", err)
+		}
+		if err != nil && err.Error() != "failed to validate token" {
+			t.Errorf("error message = %q, want \"failed to validate token\"", err.Error())
 		}
 	})
 

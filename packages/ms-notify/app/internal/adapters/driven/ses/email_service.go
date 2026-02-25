@@ -7,14 +7,18 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ses/types"
 	"github.com/cks-solutions/hackathon/ms-notify/internal/core/entities"
 	"github.com/cks-solutions/hackathon/ms-notify/internal/core/ports"
-	"github.com/cks-solutions/hackathon/ms-notify/internal/infra/aws"
 )
 
-type EmailServiceImpl struct {
-	client aws.SESClient
+// sesClientInterface allows testing without a real SES client. *infra/aws.SESClient satisfies it.
+type sesClientInterface interface {
+	SendEmail(ctx context.Context, params *ses.SendEmailInput, optFns ...func(*ses.Options)) (*ses.SendEmailOutput, error)
 }
 
-func NewEmailService(client aws.SESClient) ports.EmailService {
+type EmailServiceImpl struct {
+	client sesClientInterface
+}
+
+func NewEmailService(client sesClientInterface) ports.EmailService {
 	return &EmailServiceImpl{client: client}
 }
 

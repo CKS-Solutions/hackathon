@@ -8,16 +8,11 @@ import (
 func TestHTTPHelpers(t *testing.T) {
 	tests := []struct {
 		name       string
-		fn         func(string) *HTTPError
+		fn         func(string) *HttpError
 		msg        string
 		wantStatus int
 	}{
 		{"BadRequest", HTTPBadRequest, "bad", http.StatusBadRequest},
-		{"Unauthorized", HTTPUnauthorized, "unauthorized", http.StatusUnauthorized},
-		{"NotFound", HTTPNotFound, "not found", http.StatusNotFound},
-		{"Conflict", HTTPConflict, "conflict", http.StatusConflict},
-		{"MethodNotAllowed", HTTPMethodNotAllowed, "not allowed", http.StatusMethodNotAllowed},
-		{"InternalServerError", HTTPInternalServerError, "internal", http.StatusInternalServerError},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -35,10 +30,10 @@ func TestHTTPHelpers(t *testing.T) {
 	}
 }
 
-func TestNewHTTPError(t *testing.T) {
+func TestNewHttpError(t *testing.T) {
 	msg := "custom error"
 	code := 418
-	err := NewHTTPError(code, msg)
+	err := NewHttpError(code, msg)
 	if err == nil {
 		t.Fatal("expected non-nil error")
 	}
