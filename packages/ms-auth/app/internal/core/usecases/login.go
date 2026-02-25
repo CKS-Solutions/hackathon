@@ -34,7 +34,7 @@ func (u *LoginUsecaseImpl) Execute(ctx context.Context, input dto.LoginInput) (*
 	}
 
 	user, err := u.userRepository.FindByEmail(ctx, input.Email)
-	if err != nil {
+	if err != nil || user == nil {
 		return nil, ErrInvalidCredentials
 	}
 
