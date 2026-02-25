@@ -14,7 +14,6 @@ coverage.html
 
 # Dependências
 /vendor/
-go.sum
 
 # IDEs
 .vscode/
