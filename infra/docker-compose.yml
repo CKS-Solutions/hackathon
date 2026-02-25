@@ -3,9 +3,9 @@ services:
   postgres:
     image: postgres:15-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-dev}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev}
-      POSTGRES_DB: ${POSTGRES_DB:-video_system}
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: video_system
     ports:
       - "5432:5432"
     volumes:
@@ -13,36 +13,41 @@ services:
     networks:
       - video-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      test: ["CMD-SHELL", "pg_isready -U dev -d video_system"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 5s
-
-  rabbitmq:
-    image: rabbitmq:3-management-alpine
+    
+  localstack:
+    image: localstack/localstack:latest
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "4566:4566"
+    environment:
+      - SERVICES=s3,sqs,dynamodb,ses
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data
+      - DOCKER_HOST=unix:///var/run/docker.sock
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
+      - "./localstack:/etc/localstack/init/ready.d"
+      - "/var/run/docker.sock:/var/run/docker.sock"
     networks:
       - video-network
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
 
   ms-auth:
     build:
-      context: ../packages/ms-stub
-      dockerfile: Dockerfile
-    image: ms-stub
+      context: ../packages/ms-auth/app
     environment:
-      SERVICE_NAME: ms-auth
-      PORT: "8080"
+      - SERVICE_NAME=ms-auth
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=dev
+      - DB_PASSWORD=dev
+      - DB_NAME=video_system
+      - DB_SSLMODE=disable
+      - JWT_SECRET=your-secret-key-change-in-production
+      - JWT_EXPIRATION_HOURS=24
+      - PORT=8080
     ports:
       - "8081:8080"
     networks:
@@ -54,16 +59,22 @@ services:
       retries: 3
       start_period: 5s
     depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+      - postgres
 
   ms-video:
-    image: ms-stub
+    build:
+      context: ../packages/ms-video/app
     environment:
-      SERVICE_NAME: ms-video
-      PORT: "8080"
+      - SERVICE_NAME=ms-video
+      - AWS_REGION=us-east-1
+      - STAGE=dev
+      - AWS_ENDPOINT_URL=http://localstack:4566
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - SQS_QUEUE_URL=http://localstack:4566/000000000000/MSVideo-Queue
+      - JWT_SECRET=your-secret-key-change-in-production
+      - PORT=8080
+      - MS_NOTIFY_URL=http://ms-notify:8080
     ports:
       - "8082:8080"
     networks:
@@ -75,16 +86,20 @@ services:
       retries: 3
       start_period: 5s
     depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+      - localstack
 
   ms-notify:
-    image: ms-stub
+    build:
+      context: ../packages/ms-notify/app
     environment:
-      SERVICE_NAME: ms-notify
-      PORT: "8080"
+      - SERVICE_NAME=ms-notify
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_ENDPOINT_URL=http://localstack:4566
+      - SQS_QUEUE_URL=http://localstack:4566/000000000000/MSNotify-Queue
+      - DYNAMODB_TABLE=MSNotify.Notification
+      - SES_SENDER=cks.hackathon.noreply@gmail.com
     ports:
       - "8083:8080"
     networks:
@@ -96,10 +111,7 @@ services:
       retries: 3
       start_period: 5s
     depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+      - localstack
 
 networks:
   video-network:

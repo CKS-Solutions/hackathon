@@ -33,6 +33,8 @@ jobs:
               - 'packages/ms-auth/**'
             ms-notify:
               - 'packages/ms-notify/**'
+            ms-video:
+              - 'packages/ms-video/**'
 
       - name: Set matrix for changed services
         id: set-matrix
@@ -40,13 +42,16 @@ jobs:
           services='[]'
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            services='[{"name":"ms-auth","path":"packages/ms-auth/app"},{"name":"ms-notify","path":"packages/ms-notify/app"}]'
+            services='[{"name":"ms-auth","path":"packages/ms-auth/app"},{"name":"ms-notify","path":"packages/ms-notify/app"},{"name":"ms-video","path":"packages/ms-video/app"}]'
           else
             if [ "${{ steps.filter.outputs.ms-auth }}" = "true" ]; then
               services=$(echo $services | jq -c '. + [{"name":"ms-auth","path":"packages/ms-auth/app"}]')
             fi
             if [ "${{ steps.filter.outputs.ms-notify }}" = "true" ]; then
               services=$(echo $services | jq -c '. + [{"name":"ms-notify","path":"packages/ms-notify/app"}]')
+            fi
+            if [ "${{ steps.filter.outputs.ms-video }}" = "true" ]; then
+              services=$(echo $services | jq -c '. + [{"name":"ms-video","path":"packages/ms-video/app"}]')
             fi
           fi
 

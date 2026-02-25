@@ -49,6 +49,22 @@ output "ms_notify_ses_sender_email" {
   value       = module.ms_notify_ses.email
 }
 
+# ms-video: use these for Deployment env (ConfigMap/Secret or External Secrets)
+output "ms_video_bucket_name" {
+  description = "S3 bucket name for video storage. Set as env in ms-video Deployment."
+  value       = aws_s3_bucket.video_system.id
+}
+
+output "ms_video_sqs_queue_url" {
+  description = "SQS queue URL for ms-video processing. Set as env in ms-video Deployment."
+  value       = module.ms_video_sqs.queue_url
+}
+
+output "ms_video_dynamodb_table_name" {
+  description = "DynamoDB table name for ms-video metadata. Set as env in ms-video Deployment."
+  value       = aws_dynamodb_table.ms_video_videos.name
+}
+
 output "app_irsa_role_arn" {
   description = "ARN of the IAM role for video-system apps (IRSA). ServiceAccount video-system/app; used by ms-auth, ms-video, ms-notify."
   value       = aws_iam_role.app.arn

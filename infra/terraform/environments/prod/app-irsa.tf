@@ -49,6 +49,23 @@ data "aws_iam_policy_document" "app" {
     ]
   }
 
+  # S3: acesso aos buckets de vídeo (ms-video)
+  statement {
+    sid    = "S3"
+    effect = "Allow"
+    actions = [
+      "s3:GetObject",
+      "s3:PutObject",
+      "s3:DeleteObject",
+      "s3:ListBucket",
+      "s3:GetBucketLocation"
+    ]
+    resources = [
+      "arn:aws:s3:::video-system-*",
+      "arn:aws:s3:::video-system-*/*"
+    ]
+  }
+
   # SES: envio de e-mail (recurso * é o usual para SendEmail/SendRawEmail)
   statement {
     sid    = "SES"

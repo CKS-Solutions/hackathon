@@ -61,7 +61,6 @@ func NewRouter(ctx context.Context, region awsinfra.Region, stage awsinfra.Stage
 		w.Write(healthResp)
 	})
 
-	mux.Handle("/notification", notificationController.Create)
 	mux.Handle("/notify/notification", notificationController.Create)
 
 	return mux

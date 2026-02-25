@@ -44,10 +44,8 @@ jobs:
           filters: |
             ms-auth:
               - 'packages/ms-auth/**'
-              - 'packages/ms-stub/**'
             ms-video:
               - 'packages/ms-video/**'
-              - 'packages/ms-stub/**'
             ms-notify:
               - 'packages/ms-notify/**'
             workflow:
