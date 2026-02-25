@@ -62,7 +62,7 @@ func NewRouter(ctx context.Context, region awsinfra.Region, stage awsinfra.Stage
 	videoController := controller.NewVideoController(uploadUsecase, listUsecase, downloadUsecase)
 
 	healthResp := []byte(`{"status":"healthy","service":"ms-video"}`)
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/video/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write(healthResp)
