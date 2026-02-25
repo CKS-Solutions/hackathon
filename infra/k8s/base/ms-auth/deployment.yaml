@@ -23,6 +23,14 @@ spec:
           env:
             - name: SERVICE_NAME
               value: "ms-auth"
+            - name: STAGE
+              value: "api"
+            - name: AWS_REGION
+              value: "us-east-1"
+            - name: DB_SECRET_NAME
+              value: "hackathon-prod-ms-auth-db-password"
+            - name: JWT_SECRET_NAME
+              value: "hackathon-prod-jwt-secret"
             - name: PORT
               value: "8080"
           resources:

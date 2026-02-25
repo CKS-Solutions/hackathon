@@ -104,3 +104,14 @@ output "ms_auth_db_security_group_id" {
   description = "Security group ID for ms-auth RDS instance."
   value       = module.ms_auth_rds.security_group_id
 }
+
+# Shared secrets
+output "jwt_secret_arn" {
+  description = "ARN of the Secrets Manager secret containing JWT secret shared by ms-auth and ms-video."
+  value       = aws_secretsmanager_secret.jwt_secret.arn
+}
+
+output "jwt_secret_name" {
+  description = "Name of the Secrets Manager secret containing JWT secret."
+  value       = aws_secretsmanager_secret.jwt_secret.name
+}

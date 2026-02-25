@@ -39,6 +39,8 @@ services:
       context: ../packages/ms-auth/app
     environment:
       - SERVICE_NAME=ms-auth
+      - STAGE=local
+      - AWS_REGION=us-east-1
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=dev

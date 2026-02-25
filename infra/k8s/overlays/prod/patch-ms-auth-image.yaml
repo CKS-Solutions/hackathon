@@ -10,3 +10,12 @@ spec:
         - name: ms-auth
           image: 027653366477.dkr.ecr.us-east-1.amazonaws.com/ms-auth:latest
           imagePullPolicy: Always
+          env:
+            - name: SERVICE_NAME
+              value: "ms-auth"
+            - name: PORT
+              value: "8080"
+            - name: JWT_SECRET
+              value: "your-secret-key-change-in-production"
+            - name: JWT_EXPIRATION_HOURS
+              value: "24"
