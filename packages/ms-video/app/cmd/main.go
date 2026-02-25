@@ -24,7 +24,7 @@ func main() {
 	if stage == awsinfra.STAGE_PROD {
 		log.Println("🔐 Loading JWT secret from AWS Secrets Manager...")
 		
-		awsConfig := awsinfra.NewConfig(region, stage)
+		awsConfig := awsinfra.NewAWSConfig(region, stage)
 		secretsService := sm.NewSecretsManagerService(awsConfig)
 		
 		jwtSecretName := utils.GetEnv("JWT_SECRET_NAME", "hackathon-prod-jwt-secret")

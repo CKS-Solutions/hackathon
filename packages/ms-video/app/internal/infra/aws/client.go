@@ -15,6 +15,11 @@ import (
 type Region string
 type Stage string
 
+const (
+	STAGE_LOCAL Stage = "local"
+	STAGE_PROD  Stage = "api"
+)
+
 func NewAWSConfig(region Region, stage Stage) aws.Config {
 	cfg, err := config.LoadDefaultConfig(context.TODO(),
 		config.WithRegion(string(region)),
