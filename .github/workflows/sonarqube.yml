@@ -1,0 +1,131 @@
+name: Build and SonarQube
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - 'packages/**'
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'packages/**'
+    types: [opened, synchronize, reopened]
+
+jobs:
+  detect-changes:
+    name: Detect changed services
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.set-matrix.outputs.services }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            ms-auth:
+              - 'packages/ms-auth/**'
+            ms-notify:
+              - 'packages/ms-notify/**'
+
+      - name: Set matrix for changed services
+        id: set-matrix
+        run: |
+          services='[]'
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            services='[{"name":"ms-auth","path":"packages/ms-auth/app"},{"name":"ms-notify","path":"packages/ms-notify/app"}]'
+          else
+            if [ "${{ steps.filter.outputs.ms-auth }}" = "true" ]; then
+              services=$(echo $services | jq -c '. + [{"name":"ms-auth","path":"packages/ms-auth/app"}]')
+            fi
+            if [ "${{ steps.filter.outputs.ms-notify }}" = "true" ]; then
+              services=$(echo $services | jq -c '. + [{"name":"ms-notify","path":"packages/ms-notify/app"}]')
+            fi
+          fi
+
+          echo "services=$services" >> $GITHUB_OUTPUT
+          echo "Detected services: $services"
+
+  build:
+    name: Build (${{ matrix.service.name }})
+    runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.services != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.detect-changes.outputs.services) }}
+    concurrency:
+      group: build-${{ matrix.service.name }}-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache-dependency-path: ${{ matrix.service.path }}/go.sum
+
+      - name: Build
+        working-directory: ${{ matrix.service.path }}
+        run: go build ./...
+
+  sonarqube:
+    name: SonarQube (${{ matrix.service.name }})
+    runs-on: ubuntu-latest
+    needs: [detect-changes, build]
+    if: needs.detect-changes.outputs.services != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.detect-changes.outputs.services) }}
+    concurrency:
+      group: sonar-${{ matrix.service.name }}-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache-dependency-path: ${{ matrix.service.path }}/go.sum
+
+      - name: Run tests and generate coverage
+        working-directory: ${{ matrix.service.path }}
+        run: |
+          go test -v -coverprofile=coverage.out ./... 2>&1 || true
+          if [ ! -f coverage.out ]; then
+            echo "mode: set" > coverage.out
+          fi
+
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@v7
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+        with:
+          projectBaseDir: ${{ matrix.service.path }}
+          args: >
+            -Dsonar.pullrequest.key=${{ github.event.pull_request.number }}
+            -Dsonar.pullrequest.branch=${{ github.head_ref }}
+            -Dsonar.pullrequest.base=${{ github.base_ref }}
+
+      - name: SonarQube Quality Gate
+        uses: sonarsource/sonarqube-quality-gate-action@v1.1.0
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+        with:
+          scanMetadataReportFile: ${{ matrix.service.path }}/.scannerwork/report-task.txt
