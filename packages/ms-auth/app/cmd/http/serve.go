@@ -58,21 +58,21 @@ func NewRouter(ctx context.Context, db *sql.DB, jwtSecret string, jwtExpiration 
 		w.Write([]byte(`{"status":"healthy","service":"ms-auth"}`))
 	})
 
-	mux.HandleFunc("/auth/register", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/register", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if err := authController.Register(ctx, w, r); err != nil {
 			handleError(w, err)
 		}
 	})
 
-	mux.HandleFunc("/auth/login", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if err := authController.Login(ctx, w, r); err != nil {
 			handleError(w, err)
 		}
 	})
 
-	mux.HandleFunc("/auth/validate", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/validate", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if err := authController.ValidateToken(ctx, w, r); err != nil {
 			handleError(w, err)
