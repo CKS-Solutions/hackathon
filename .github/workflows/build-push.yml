@@ -118,3 +118,44 @@ jobs:
           docker tag "${{ matrix.service }}:${{ github.sha }}" "${repo}:latest"
           docker push "${repo}:${{ github.sha }}"
           docker push "${repo}:latest"
+
+  update-image-tags:
+    name: Update prod image tags in repo
+    needs: [changes, build]
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && needs.changes.outputs.services != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update image tags in patch files
+        run: |
+          SHA="${{ github.sha }}"
+          SERVICES='${{ needs.changes.outputs.services }}'
+          for svc in $(echo "$SERVICES" | jq -r '.[]'); do
+            case "$svc" in
+              ms-auth)   f="infra/k8s/overlays/prod/patch-ms-auth-image.yaml" ;;
+              ms-video)  f="infra/k8s/overlays/prod/patch-ms-video-image.yaml" ;;
+              ms-notify) f="infra/k8s/overlays/prod/patch-ms-notify-image.yaml" ;;
+              *) echo "Unknown service: $svc"; exit 1 ;;
+            esac
+            sed -i "s|image: .*/${svc}:.*|image: ${ECR_REGISTRY}/${svc}:${SHA}|" "$f"
+          done
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add infra/k8s/overlays/prod/patch-ms-*-image.yaml
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "chore(infra): update prod image tags to ${{ github.sha }}"
+          git push origin master
