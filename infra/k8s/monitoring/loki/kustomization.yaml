@@ -7,3 +7,4 @@ resources:
   - loki-service.yaml
   - promtail-configmap.yaml
   - promtail-daemonset.yaml
+  - grafana-datasource-loki.yaml

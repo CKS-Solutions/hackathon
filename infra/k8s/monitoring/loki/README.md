@@ -10,9 +10,11 @@ Os microsserviços (ms-auth, ms-video, ms-notify) já escrevem em stdout com `lo
 1. Garanta que o namespace `monitoring` existe (criado pelo `monitoring-stack` / Prometheus + Grafana).
 2. Aplique a Application do Argo CD:  
    `kubectl apply -f infra/k8s/argocd/application-loki.yaml`
-3. No **Grafana**, adicione o data source **Loki**:
-   - URL: `http://loki.monitoring.svc.cluster.local:3100` (ou `http://loki:3100` se o Grafana estiver no mesmo namespace).
-   - Save & Test.
+3. O data source **Loki** é provisionado via ConfigMap (`grafana-datasource-loki.yaml`). Para o Grafana carregar:
+   ```bash
+   kubectl rollout restart deployment -l app.kubernetes.io/name=grafana -n monitoring
+   ```
+   Se o Loki ainda não aparecer no Explore, faça sync da application `loki-stack` no Argo CD e repita o restart.
 
 ## Consultar logs no Grafana
 

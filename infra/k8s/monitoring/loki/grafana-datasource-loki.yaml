@@ -1,0 +1,21 @@
+# ConfigMap para o sidecar do Grafana (kube-prometheus-stack) provisionar o data source Loki.
+# O sidecar procura ConfigMaps com label grafana_datasource="1" e monta em /etc/grafana/provisioning/datasources.
+# Após aplicar, reinicie o Grafana: kubectl rollout restart deployment -l app.kubernetes.io/name=grafana -n monitoring
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasource-loki
+  namespace: monitoring
+  labels:
+    grafana_datasource: "1"
+data:
+  loki.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki:3100
+        isDefault: false
+        editable: false
