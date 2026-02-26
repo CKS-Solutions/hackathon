@@ -9,38 +9,38 @@ Sistema distribuído na AWS para upload, processamento assíncrono e notificaç�
 O sistema roda na **AWS**: o cluster **EKS** orquestra três microsserviços em Go. O processamento de vídeo é **assíncrono** (upload → fila → worker → notificação por e-mail).
 
 ```
-                    ┌─────────────────────────────────────────────────────────────────┐
-                    │                         AWS                                       │
-                    │  ┌───────────────────────────────────────────────────────────┐  │
-                    │  │                    Amazon EKS (Kubernetes)                   │  │
-                    │  │                                                             │  │
-                    │  │   ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    │  │
-                    │  │   │  ms-auth    │    │  ms-video   │    │  ms-notify  │    │  │
-                    │  │   │  (JWT)      │    │  upload/    │    │  (email)    │    │  │
-                    │  │   │  register,  │    │  list/      │    │  SQS→SES    │    │  │
-                    │  │   │  login      │    │  download   │    │             │    │  │
-                    │  │   └──────┬──────┘    └──────┬──────┘    └──────┬──────┘    │  │
-                    │  │          │                   │                   │          │  │
-                    │  │          │              ┌────▼────┐              │          │  │
-                    │  │          │              │   SQS   │◄─────────────┘          │  │
-                    │  │          │              │ (queue) │   evento "vídeo         │  │
-                    │  │          │              └────┬────┘    processado"         │  │
-                    │  │   ┌──────▼──────┐    ┌──────▼──────┐                       │  │
-                    │  │   │ PostgreSQL  │    │ S3 + DynamoDB│  (vídeos + metadata) │  │
-                    │  │   │ (auth)       │    │ (video)     │                       │  │
-                    │  │   └──────────────┘    └─────────────┘                       │  │
-                    │  │                                                             │  │
-                    │  │   Ingress / ALB  ◄─── tráfego HTTPS                         │  │
-                    │  └─────────────────────────────────────────────────────────────┘  │
-                    │  Terraform: VPC, EKS, ECR, RDS, S3, SQS, DynamoDB, SES, IAM       │
-                    └───────────────────────────────────────────────────────────────────┘
-                                         ▲
-                                         │ deploy (imagens + manifests)
-                    ┌────────────────────┴────────────────────┐
-                    │  GitHub Actions (CI/CD)                  │
-                    │  • Build & push Docker → ECR             │
-                    │  • Commit image tags → Argo CD (GitOps)  │
-                    └─────────────────────────────────────────┘
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                              AWS                                         │
+    │  ┌───────────────────────────────────────────────────────────────────┐  │
+    │  │                   Amazon EKS (Kubernetes)                           │  │
+    │  │                                                                   │  │
+    │  │   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐           │  │
+    │  │   │  ms-auth    │   │  ms-video   │   │  ms-notify  │           │  │
+    │  │   │  (JWT)      │   │  upload/    │   │  (email)    │           │  │
+    │  │   │  register,  │   │  list/      │   │  SQS->SES   │           │  │
+    │  │   │  login      │   │  download   │   │             │           │  │
+    │  │   └──────┬──────┘   └──────┬──────┘   └──────┬──────┘           │  │
+    │  │          │                 │                 │                   │  │
+    │  │          │            ┌────▼────┐            │                   │  │
+    │  │          │            │   SQS   │<────────────┘                   │  │
+    │  │          │            │ (queue) │  evento video processado        │  │
+    │  │          │            └────┬────┘                                  │  │
+    │  │   ┌──────▼──────┐   ┌──────▼──────┐                                │  │
+    │  │   │ PostgreSQL  │   │ S3+DynamoDB │  (videos + metadata)            │  │
+    │  │   │ (auth)      │   │ (video)     │                                │  │
+    │  │   └─────────────┘   └─────────────┘                                │  │
+    │  │                                                                   │  │
+    │  │   Ingress / ALB  <--- trafego HTTPS                               │  │
+    │  └───────────────────────────────────────────────────────────────────┘  │
+    │  Terraform: VPC, EKS, ECR, RDS, S3, SQS, DynamoDB, SES, IAM             │
+    └─────────────────────────────────────────────────────────────────────────┘
+                                 ▲
+                                 | deploy (imagens + manifests)
+    ┌────────────────────────────┴────────────────────────────┐
+    │  GitHub Actions (CI/CD)                                   │
+    │  - Build & push Docker -> ECR                            │
+    │  - Commit image tags -> Argo CD (GitOps)                 │
+    └─────────────────────────────────────────────────────────────┘
 ```
 
 ### Fluxo de dados
