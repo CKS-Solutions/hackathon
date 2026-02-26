@@ -183,7 +183,7 @@ go run cmd/main.go
 ## AWS Resources Required
 
 ### S3 Bucket
-- Bucket name: `video-system-{stage}` (e.g., `video-system-dev`)
+- Bucket name: `cks-hackathon-video-system`
 - Folders:
   - `raw/` - Stores uploaded videos
   - `processed/` - Stores processed ZIP files

@@ -7,7 +7,7 @@ echo "Initializing LocalStack resources for ms-video..."
 # Wait for LocalStack to be ready
 sleep 5
 
-MSVIDEO_BUCKET_NAME="video-system"
+MSVIDEO_BUCKET_NAME="cks-hackathon-video-system"
 MSVIDEO_QUEUE_NAME="MSVideo-Queue"
 MSVIDEO_TABLE_NAME="MSVideo.Video"
 
