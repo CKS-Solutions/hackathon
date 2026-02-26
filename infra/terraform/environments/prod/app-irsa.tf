@@ -61,8 +61,8 @@ data "aws_iam_policy_document" "app" {
       "s3:GetBucketLocation"
     ]
     resources = [
-      "arn:aws:s3:::video-system-*",
-      "arn:aws:s3:::video-system-*/*"
+      "arn:aws:s3:::cks-hackathon-video-system-*",
+      "arn:aws:s3:::cks-hackathon-video-system-*/*"
     ]
   }
 
