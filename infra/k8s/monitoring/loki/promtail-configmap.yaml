@@ -38,10 +38,3 @@ data:
             target_label: app
           - replacement: kubernetes-pods
             target_label: job
-        pipeline_stages:
-          - kubernetes:
-              labels:
-                namespace: namespace
-                pod: pod_name
-                container: container_name
-                app: app
