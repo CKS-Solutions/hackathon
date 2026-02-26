@@ -1,0 +1,22 @@
+# Loki + Promtail para coletar logs dos pods (incluindo ms-auth, ms-video, ms-notify).
+# Aplicar uma vez: kubectl apply -f infra/k8s/argocd/application-loki.yaml
+# Requer o namespace monitoring (criado pelo monitoring-stack). No Grafana, adicione data source Loki: http://loki:3100
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki-stack
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/CKS-Solutions/hackathon
+    path: infra/k8s/monitoring/loki
+    targetRevision: master
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
