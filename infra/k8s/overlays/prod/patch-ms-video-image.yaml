@@ -8,5 +8,5 @@ spec:
       serviceAccountName: app
       containers:
         - name: ms-video
-          image: 027653366477.dkr.ecr.us-east-1.amazonaws.com/ms-video:a94c291408f21f52a19e4af4bcea0df59b8ca604
+          image: 027653366477.dkr.ecr.us-east-1.amazonaws.com/ms-video:7be192c36a2be4307b3c40de1862133b31973858
           imagePullPolicy: Always

@@ -8,7 +8,7 @@ spec:
       serviceAccountName: app
       containers:
         - name: ms-auth
-          image: 027653366477.dkr.ecr.us-east-1.amazonaws.com/ms-auth:1e2fb8daee35b7ecd677ea320c0e5404899e0264
+          image: 027653366477.dkr.ecr.us-east-1.amazonaws.com/ms-auth:7be192c36a2be4307b3c40de1862133b31973858
           imagePullPolicy: Always
           env:
             - name: SERVICE_NAME
