@@ -148,10 +148,6 @@ jobs:
             sed -i "s|image: .*/${svc}:.*|image: ${ECR_REGISTRY}/${svc}:${SHA}|" "$f"
           done
         
-      - uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
