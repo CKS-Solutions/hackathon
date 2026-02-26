@@ -16,7 +16,7 @@ services:
 
   ms-video:
     build:
-      context: ./app
+      context: .
     ports:
       - "8082:8080"
     environment:
