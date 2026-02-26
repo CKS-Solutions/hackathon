@@ -144,3 +144,4 @@ Ou usar o Compose da infra (stubs ou serviços reais): `docker compose -f infra/
 3. **Bootstrap (Helm):** instalar AWS Load Balancer Controller e Argo CD no cluster.
 - **ms-video (upload, download, S3, SQS, worker):** [packages/ms-video/README.md](packages/ms-video/README.md)
 - **ms-notify (notificações, SQS, SES, DynamoDB):** [packages/ms-notify/README.md](packages/ms-notify/README.md)
+- **ms-auth (autenticação, JWT, PostgreSQL):** [packages/ms-auth/README.md](packages/ms-auth/README.md)
