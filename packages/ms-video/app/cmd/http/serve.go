@@ -67,6 +67,11 @@ func NewRouter(ctx context.Context, region awsinfra.Region, stage awsinfra.Stage
 		w.WriteHeader(http.StatusOK)
 		w.Write(healthResp)
 	})
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(healthResp)
+	})
 
 	mux.HandleFunc("/video/upload", middleware.AuthMiddleware(tokenService, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
