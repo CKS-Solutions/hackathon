@@ -47,6 +47,9 @@ spec:
       labels:
         app: promtail
     spec:
+      hostNetwork: true
+      hostPID: true
+      dnsPolicy: ClusterFirstWithHostNet
       serviceAccountName: promtail
       tolerations:
         - effect: NoSchedule
@@ -56,6 +59,13 @@ spec:
           image: grafana/promtail:2.9.4
           args:
             - -config.file=/etc/promtail/promtail.yaml
+          env:
+            # Promtail filtra targets por __host__; com hostNetwork o hostname pode ser do node.
+            # Garantir que HOSTNAME = node name para o filtro não descartar todos os targets.
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
           ports:
             - containerPort: 9080
               name: http

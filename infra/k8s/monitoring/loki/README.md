@@ -24,7 +24,32 @@ Os microsserviços (ms-auth, ms-video, ms-notify) já escrevem em stdout com `lo
 - Por pod: `{namespace="video-system", pod=~"ms-auth-.*"}`.
 - Intervalo: use "Last 15 minutes" ou "Last 1 hour" para ver logs recentes.
 
-## Se os logs não aparecerem
+## Testar se o Loki está recebendo (Grafana vazio)
+
+Se nem `{namespace="monitoring"}` mostra nada no Grafana, confira:
+
+1. **Loki está up e aceita push?** (use timestamp atual; Loki rejeita logs “too old”)
+   ```bash
+   kubectl get pods -n monitoring -l app=loki
+   kubectl run curl-loki --rm -it --restart=Never --image=curlimages/curl -n monitoring -- \
+     sh -c 'TS=$(date +%s)000000000; curl -s -w "\nHTTP_CODE:%{http_code}" -X POST "http://loki:3100/loki/api/v1/push" -H "Content-Type: application/json" -d "{\"streams\":[{\"stream\":{\"test\":\"manual\"},\"values\":[[\""$TS"\",\"teste manual push\"]]}]}"'
+   ```
+   A última linha deve ser `HTTP_CODE:204`. No Grafana (Explore → Loki), use `{test="manual"}` e intervalo "Last 5 minutes". Se aparecer "teste manual push", Loki e Grafana estão ok e o problema é o Promtail não enviando.
+
+2. **Promtail está enviando ou dando erro?**
+   ```bash
+   kubectl logs -n monitoring promtail-s67pj --tail=300 2>&1 | grep -iE "error|fail|push|sent"
+   ```
+
+3. **Reiniciar Promtail e limpar positions** (para forçar nova leitura dos arquivos):
+   ```bash
+   kubectl rollout restart daemonset/promtail -n monitoring
+   ```
+   Aguarde 2 minutos e teste de novo no Grafana: `{namespace="monitoring"}` e `{namespace="video-system"}`, intervalo "Last 15 minutes".
+
+---
+
+## Se os logs ainda não aparecerem
 
 1. **Cada node só tem os pods que rodam nele.** O `ls /var/log/pods/` que você rodou foi num node onde não há pods do `video-system` (só argocd, kube-system, monitoring). Os ms-auth/ms-video/ms-notify estão em outro node.
    - No Grafana, teste primeiro se **algum** log chega: use `{namespace="monitoring"}` ou `{namespace="argocd"}` (intervalo "Last 1 hour"). Se aparecer, o Loki está recebendo; aí o que falta é ver o node onde está o video-system.
