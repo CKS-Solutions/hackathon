@@ -22,10 +22,9 @@ data:
         pipeline_stages:
           - cri: {}
         relabel_configs:
-          # Só processar pods do mesmo node onde o Promtail está rodando
-          - source_labels: [__meta_kubernetes_pod_node_name]
-            target_label: __host__
-          # Path: glob * antes de uid/container para dar match em <ns>_<pod>_<uid>/<container>/*.log
+          # Não usar __host__: no K8s o hostname do pod ≠ node name, e aí o Promtail descarta todos os targets.
+          # Só os paths que existem no node (pods deste node) serão lidos.
+          # Path no node (containerd): <ns>_<pod>_<uid>/<container>/0.log
           - source_labels: [__meta_kubernetes_pod_uid, __meta_kubernetes_pod_container_name]
             separator: /
             regex: "(.+)"
