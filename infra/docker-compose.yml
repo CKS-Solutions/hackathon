@@ -36,7 +36,8 @@ services:
 
   ms-auth:
     build:
-      context: ../packages/ms-auth/app
+      context: ../packages
+      dockerfile: ms-auth/Dockerfile
     environment:
       - SERVICE_NAME=ms-auth
       - STAGE=local
@@ -65,7 +66,8 @@ services:
 
   ms-video:
     build:
-      context: ../packages/ms-video/app
+      context: ../packages
+      dockerfile: ms-video/Dockerfile
     environment:
       - SERVICE_NAME=ms-video
       - AWS_REGION=us-east-1
@@ -92,7 +94,8 @@ services:
 
   ms-notify:
     build:
-      context: ../packages/ms-notify/app
+      context: ../packages
+      dockerfile: ms-notify/Dockerfile
     environment:
       - SERVICE_NAME=ms-notify
       - AWS_REGION=us-east-1

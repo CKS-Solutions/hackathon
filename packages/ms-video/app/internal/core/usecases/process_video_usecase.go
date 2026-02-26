@@ -5,8 +5,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"os"
+	"path/filepath"
 	"time"
+
+	ffmpeg "github.com/u2takey/ffmpeg-go"
 
 	"github.com/cks-solutions/hackathon/ms-video/internal/adapters/driver/dto"
 	"github.com/cks-solutions/hackathon/ms-video/internal/core/entities"
@@ -63,15 +68,27 @@ func (u *ProcessVideoUsecase) Execute(ctx context.Context, message dto.VideoProc
 	video.UpdateProgress(30, entities.VideoStatusProcessing)
 	u.videoRepository.Update(ctx, video)
 
-	log.Printf("Processing video %s", message.VideoID)
-	
-	time.Sleep(2 * time.Second)
+	log.Printf("Extracting frames from video %s", message.VideoID)
+	frames, err := u.extractFrames(videoData, video.ID, video.OriginalName)
+	if err != nil {
+		video.MarkAsFailed(fmt.Sprintf("failed to extract frames: %v", err))
+		u.videoRepository.Update(ctx, video)
+		
+		if message.UserEmail != "" {
+			notifyErr := u.notificationService.SendVideoFailedNotification(ctx, message.UserEmail, video.ID, video.OriginalName, fmt.Sprintf("Failed to extract frames: %v", err))
+			if notifyErr != nil {
+				log.Printf("Failed to send failure notification: %v", notifyErr)
+			}
+		}
+		
+		return err
+	}
 	
 	video.UpdateProgress(60, entities.VideoStatusProcessing)
 	u.videoRepository.Update(ctx, video)
 
-	log.Printf("Creating ZIP file for video %s", message.VideoID)
-	zipData, err := u.createZipFile(video.OriginalName, videoData)
+	log.Printf("Creating ZIP file for video %s with %d frames", message.VideoID, len(frames))
+	zipData, err := u.createZipFile(video.OriginalName, videoData, frames)
 	if err != nil {
 		video.MarkAsFailed(fmt.Sprintf("failed to create zip file: %v", err))
 		u.videoRepository.Update(ctx, video)
@@ -122,7 +139,58 @@ func (u *ProcessVideoUsecase) Execute(ctx context.Context, message dto.VideoProc
 	return nil
 }
 
-func (u *ProcessVideoUsecase) createZipFile(originalName string, videoData []byte) ([]byte, error) {
+func (u *ProcessVideoUsecase) extractFrames(videoData []byte, videoID, originalName string) ([][]byte, error) {
+	tmpDir, err := ioutil.TempDir("", "video-processing-")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp dir: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	videoPath := filepath.Join(tmpDir, "input"+filepath.Ext(originalName))
+	if err := ioutil.WriteFile(videoPath, videoData, 0644); err != nil {
+		return nil, fmt.Errorf("failed to write video file: %w", err)
+	}
+
+	framesDir := filepath.Join(tmpDir, "frames")
+	if err := os.MkdirAll(framesDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create frames dir: %w", err)
+	}
+
+	log.Printf("Extracting frames from %s", videoPath)
+	outputPattern := filepath.Join(framesDir, "frame_%04d.jpg")
+	
+	err = ffmpeg.Input(videoPath).Filter("fps", ffmpeg.Args{"1"}).Output(outputPattern, ffmpeg.KwArgs{
+		"q:v": "2",
+	}).OverWriteOutput().ErrorToStdOut().Run()
+	
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract frames with ffmpeg: %w", err)
+	}
+
+	files, err := ioutil.ReadDir(framesDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read frames directory: %w", err)
+	}
+
+	var frames [][]byte
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		framePath := filepath.Join(framesDir, file.Name())
+		frameData, err := ioutil.ReadFile(framePath)
+		if err != nil {
+			log.Printf("Failed to read frame %s: %v", file.Name(), err)
+			continue
+		}
+		frames = append(frames, frameData)
+	}
+
+	log.Printf("Extracted %d frames from video %s", len(frames), videoID)
+	return frames, nil
+}
+
+func (u *ProcessVideoUsecase) createZipFile(originalName string, videoData []byte, frames [][]byte) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	zipWriter := zip.NewWriter(buf)
 
@@ -134,14 +202,26 @@ func (u *ProcessVideoUsecase) createZipFile(originalName string, videoData []byt
 		return nil, err
 	}
 
+	for i, frameData := range frames {
+		frameName := fmt.Sprintf("frames/frame_%04d.jpg", i+1)
+		frameFile, err := zipWriter.Create(frameName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create frame file in zip: %w", err)
+		}
+		if _, err := frameFile.Write(frameData); err != nil {
+			return nil, fmt.Errorf("failed to write frame data: %w", err)
+		}
+	}
+
 	metadataFile, err := zipWriter.Create("metadata.txt")
 	if err != nil {
 		return nil, err
 	}
-	metadata := fmt.Sprintf("Original File: %s\nProcessed: %s\nSize: %d bytes\n", 
+	metadata := fmt.Sprintf("Original File: %s\nProcessed: %s\nSize: %d bytes\nFrames Extracted: %d\n", 
 		originalName, 
 		time.Now().Format(time.RFC3339), 
-		len(videoData))
+		len(videoData),
+		len(frames))
 	if _, err := metadataFile.Write([]byte(metadata)); err != nil {
 		return nil, err
 	}
@@ -150,9 +230,10 @@ func (u *ProcessVideoUsecase) createZipFile(originalName string, videoData []byt
 	if err != nil {
 		return nil, err
 	}
-	readme := fmt.Sprintf("Video Processing Complete\n\nOriginal file: %s\nProcessed on: %s\n\nThis archive contains your processed video file.\n",
+	readme := fmt.Sprintf("Video Processing Complete\n\nOriginal file: %s\nProcessed on: %s\nFrames extracted: %d frames\n\nThis archive contains:\n- Original video file\n- Extracted frames (1 frame per second) in the 'frames' folder\n",
 		originalName,
-		time.Now().Format("2006-01-02 15:04:05"))
+		time.Now().Format("2006-01-02 15:04:05"),
+		len(frames))
 	if _, err := readmeFile.Write([]byte(readme)); err != nil {
 		return nil, err
 	}
