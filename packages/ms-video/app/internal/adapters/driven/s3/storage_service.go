@@ -16,7 +16,7 @@ type S3StorageService struct {
 	client *s3.Client
 }
 
-const BUCKET_NAME = "video-system"
+const BUCKET_NAME = "cks-hackathon-video-system"
 
 func NewS3StorageService(client *s3.Client) ports.StorageService {
 	return &S3StorageService{

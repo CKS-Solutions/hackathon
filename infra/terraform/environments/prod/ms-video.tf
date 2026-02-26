@@ -10,7 +10,7 @@ locals {
 
 # S3 bucket for video storage
 resource "aws_s3_bucket" "video_system" {
-  bucket = "video-system"
+  bucket = "cks-hackathon-video-system"
   tags   = local.ms_video_tags
 }
 
