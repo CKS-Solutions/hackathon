@@ -52,10 +52,16 @@ func NewRouter(ctx context.Context, db *sql.DB, jwtSecret string, jwtExpiration 
 
 	authController := controller.NewAuthController(registerUsecase, loginUsecase, validateTokenUsecase)
 
+	healthResp := []byte(`{"status":"healthy","service":"ms-auth"}`)
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(healthResp)
+	})
 	mux.HandleFunc("/auth/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"healthy","service":"ms-auth"}`))
+		w.Write(healthResp)
 	})
 
 	mux.HandleFunc("/auth/register", func(w http.ResponseWriter, r *http.Request) {
