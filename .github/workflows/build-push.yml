@@ -64,7 +64,7 @@ jobs:
             if [ ${#arr[@]} -eq 0 ]; then
               echo '[]' > list.json
             else
-              printf '%s\n' "${arr[@]}" | jq -R . | jq -s . > list.json
+              printf '%s\n' "${arr[@]}" | jq -R . | jq -s -c . > list.json
             fi
           fi
           echo "list=$(cat list.json)" >> $GITHUB_OUTPUT
