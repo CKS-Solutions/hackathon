@@ -1,6 +1,5 @@
 # Promtail: descobre pods no cluster e envia stdout/stderr de cada container para o Loki.
-# Path no node (containerd): /var/log/pods/<ns>_<pod>_<uid>/<container>/*.log
-# Usa o mesmo formato do Helm chart do Grafana (glob * antes do uid para dar match no diretório).
+# Path no node (containerd): /var/log/pods/<namespace>_<podname>_<uid>/<container>/0.log
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -22,15 +21,17 @@ data:
         pipeline_stages:
           - cri: {}
         relabel_configs:
-          # Não usar __host__: no K8s o hostname do pod ≠ node name, e aí o Promtail descarta todos os targets.
-          # Só os paths que existem no node (pods deste node) serão lidos.
-          # Path no node (containerd): <ns>_<pod>_<uid>/<container>/0.log
-          - source_labels: [__meta_kubernetes_pod_uid, __meta_kubernetes_pod_container_name]
-            separator: /
+          # Path exato: /var/log/pods/<namespace>_<pod>_<uid>/<container>/0.log
+          - source_labels: [__meta_kubernetes_pod_namespace, __meta_kubernetes_pod_name, __meta_kubernetes_pod_uid]
+            separator: "_"
             regex: "(.+)"
+            target_label: __tmp_pod_dir
+          - source_labels: [__tmp_pod_dir, __meta_kubernetes_pod_container_name]
+            separator: "/"
+            regex: "(.+)/(.+)"
             target_label: __path__
-            replacement: /var/log/pods/*$1/*.log
-          # Labels para filtrar no Grafana
+            replacement: /var/log/pods/$1/$2/*.log
+          # Labels para o Grafana
           - source_labels: [__meta_kubernetes_pod_node_name]
             target_label: node_name
           - source_labels: [__meta_kubernetes_namespace]

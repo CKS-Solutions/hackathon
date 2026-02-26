@@ -26,9 +26,15 @@ Os microsserviços (ms-auth, ms-video, ms-notify) já escrevem em stdout com `lo
 
 ## Se os logs não aparecerem
 
-1. Sync da application `loki-stack` no Argo CD e reinicie o Promtail para carregar a config:
+1. **Cada node só tem os pods que rodam nele.** O `ls /var/log/pods/` que você rodou foi num node onde não há pods do `video-system` (só argocd, kube-system, monitoring). Os ms-auth/ms-video/ms-notify estão em outro node.
+   - No Grafana, teste primeiro se **algum** log chega: use `{namespace="monitoring"}` ou `{namespace="argocd"}` (intervalo "Last 1 hour"). Se aparecer, o Loki está recebendo; aí o que falta é ver o node onde está o video-system.
+   - Para achar o Promtail que está no mesmo node que o ms-video:  
+     `kubectl get pods -n video-system -o wide`  
+     `kubectl get pods -n monitoring -l app=promtail -o wide`  
+     Escolha o Promtail que está no mesmo **NODE** que um pod do video-system e faça `kubectl exec -n monitoring <promtail-pod> -- ls /var/log/pods/` — aí deve aparecer pasta `video-system_...`.
+
+2. Sync da application `loki-stack` no Argo CD e reinicie o Promtail para carregar a config:
    ```bash
    kubectl rollout restart daemonset/promtail -n monitoring
    ```
-2. Aguarde 1–2 minutos e teste no Grafana com `{job="kubernetes-pods"}` (sem filtro de namespace).
-3. Confira os targets: `kubectl exec -n monitoring daemonset/promtail -c promtail -- wget -qO- http://127.0.0.1:9080/targets 2>/dev/null | head -100`
+3. Aguarde 1–2 minutos e teste no Grafana: `{namespace="video-system"}` ou `{job="kubernetes-pods"}` (intervalo "Last 1 hour").
