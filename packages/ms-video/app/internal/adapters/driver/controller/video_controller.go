@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/cks-solutions/hackathon/ms-video/internal/adapters/driver/dto"
@@ -30,6 +31,7 @@ func NewVideoController(
 }
 
 func (c *VideoController) Upload(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+	log.Println("[ms-video] upload request received - new log line")
 	if r.Method != http.MethodPost {
 		return utils.NewHttpError(http.StatusMethodNotAllowed, "method not allowed")
 	}
