@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/cks-solutions/hackathon/ms-auth/internal/adapters/driver/dto"
@@ -60,6 +61,7 @@ func (c *AuthControllerImpl) Register(ctx context.Context, w http.ResponseWriter
 }
 
 func (c *AuthControllerImpl) Login(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+	log.Println("[ms-auth] /auth/login request received")
 	if r.Method != http.MethodPost {
 		return utils.HTTPMethodNotAllowed("method not allowed")
 	}
